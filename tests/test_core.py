@@ -63,8 +63,8 @@ def _collecting_ask_interactively(asked):
 
 def test_match_stdout_reads_its_own_markers_python_output(tmp_path):
     script = _write_script(tmp_path, "a.py", "A")
-    marker = RunMarker(str(script))
-    marker.python().match_stdout("A\n", 5, 5, 0)
+    marker = RunMarker(str(tmp_path))
+    marker.python(script.name).match_stdout("A\n", 5, 5, 0)
 
     Exercise(marker).run(ask_interactively=lambda q: None)
 
@@ -74,8 +74,8 @@ def test_match_stdout_reads_its_own_markers_python_output(tmp_path):
 
 def test_match_stdout_detects_a_mismatch(tmp_path):
     script = _write_script(tmp_path, "a.py", "A")
-    marker = RunMarker(str(script))
-    marker.python().match_stdout("not-A\n", 5, 5, 0)
+    marker = RunMarker(str(tmp_path))
+    marker.python(script.name).match_stdout("not-A\n", 5, 5, 0)
 
     Exercise(marker).run(ask_interactively=lambda q: None)
 
@@ -101,13 +101,13 @@ def test_two_run_markers_do_not_leak_context(tmp_path):
     script_a = _write_script(tmp_path, "a.py", "A")
     script_b = _write_script(tmp_path, "b.py", "B")
 
-    marker_a = RunMarker(str(script_a))
-    marker_a.python().ask_for_score(
+    marker_a = RunMarker(str(tmp_path))
+    marker_a.python(script_a.name).ask_for_score(
         lambda ctx: f"rate this output: {ctx.completed_process.stdout!r}", 5
     )
 
-    marker_b = RunMarker(str(script_b))
-    marker_b.python().match_stdout("B\n", 5, 5, 0)
+    marker_b = RunMarker(str(tmp_path))
+    marker_b.python(script_b.name).match_stdout("B\n", 5, 5, 0)
 
     asked = []
     Exercise(marker_a, marker_b).run(
@@ -130,11 +130,11 @@ def test_check_consistent_with_rubric_toml_passes_when_points_match(tmp_path):
     rubric_path = _write_rubric_toml(tmp_path)
     script = _write_script(tmp_path, "a.py", "Hello World")
 
-    correctness = RunMarker(str(script), criterion="correctness")
-    correctness.python().match_stdout("Hello World\n", 10, 10, 0)
+    correctness = RunMarker(str(tmp_path), criterion="correctness")
+    correctness.python(script.name).match_stdout("Hello World\n", 10, 10, 0)
 
-    style = RunMarker(str(script), criterion="style")
-    style.python().ask_for_score("rate the style", 2)
+    style = RunMarker(str(tmp_path), criterion="style")
+    style.python(script.name).ask_for_score("rate the style", 2)
 
     exercise = Exercise(correctness, style)
     assert exercise.check_consistent_with_rubric_toml(rubric_path) == []
@@ -147,11 +147,11 @@ def test_check_consistent_with_rubric_toml_flags_a_points_mismatch(tmp_path):
     # "correctness" is worth 10 in the rubric, but this marker only
     # awards 5 -- a drift the static check must catch without running
     # anything.
-    correctness = RunMarker(str(script), criterion="correctness")
-    correctness.python().match_stdout("Hello World\n", 5, 5, 0)
+    correctness = RunMarker(str(tmp_path), criterion="correctness")
+    correctness.python(script.name).match_stdout("Hello World\n", 5, 5, 0)
 
-    style = RunMarker(str(script), criterion="style")
-    style.python().ask_for_score("rate the style", 2)
+    style = RunMarker(str(tmp_path), criterion="style")
+    style.python(script.name).ask_for_score("rate the style", 2)
 
     exercise = Exercise(correctness, style)
     [problem] = exercise.check_consistent_with_rubric_toml(rubric_path)
@@ -163,8 +163,8 @@ def test_check_consistent_with_rubric_toml_flags_an_unknown_criterion(tmp_path):
     rubric_path = _write_rubric_toml(tmp_path)
     script = _write_script(tmp_path, "a.py", "Hello World")
 
-    marker = RunMarker(str(script), criterion="not-a-real-criterion")
-    marker.python().match_stdout("Hello World\n", 10, 10, 0)
+    marker = RunMarker(str(tmp_path), criterion="not-a-real-criterion")
+    marker.python(script.name).match_stdout("Hello World\n", 10, 10, 0)
 
     # Also flags "correctness"/"style" as unmarked -- nothing in this
     # Exercise claims either -- which is correct, not just noise from
@@ -179,8 +179,8 @@ def test_check_consistent_with_rubric_toml_flags_a_criterion_with_no_marker(tmp_
 
     # Only "correctness" has a marker -- "style" (in the rubric) does
     # not, so nothing would ever mark it.
-    correctness = RunMarker(str(script), criterion="correctness")
-    correctness.python().match_stdout("Hello World\n", 10, 10, 0)
+    correctness = RunMarker(str(tmp_path), criterion="correctness")
+    correctness.python(script.name).match_stdout("Hello World\n", 10, 10, 0)
 
     [problem] = Exercise(correctness).check_consistent_with_rubric_toml(rubric_path)
     assert "style" in problem

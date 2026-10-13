@@ -1,47 +1,53 @@
-"""Worked example: a two-criterion Exercise -- one mechanical, one
-judgement -- for the "print Hello World" task, checked against
-hello_world.rubric.toml before it runs.
+"""Marking script for the "print Hello World" assignment.
 
-Run it against the correct submission (from this directory, so
-tent-arbiter finds this file by its default arb.py convention):
+Run it against a submission directory (from here, so tent-arbiter
+finds this file by its default arb.py convention):
 
-    poetry run tent-arbiter submissions/correct/hello_world.py
+    poetry run tent-arbiter submissions/correct
 
-...and against the broken one, to see the mechanical check actually
-fail (it will still ask the style question -- the two are independent
-criteria, each scored on its own):
+...and against the broken one, to see the mechanical check fail (the
+style question is still asked -- each criterion is scored on its own):
 
-    poetry run tent-arbiter submissions/broken/hello_world.py
-
-tent-arbiter calls build() below with the submission path, checks the
-result against RUBRIC_TOML, runs it, and prints each Marker's results
--- all of which used to be this file's own __main__ block.
+    poetry run tent-arbiter submissions/broken
 """
 import os
 
 from tent_arbiter.core import Exercise, RunMarker
 
 
+# tent-arbiter reads this before running the Exercise below, and
+# refuses to run it if a RunMarker's criterion/points don't match a
+# criterion actually defined here.
 RUBRIC_TOML = os.path.join(os.path.dirname(__file__), "hello_world.rubric.toml")
 
+# The assignment specifies this as the filename a submission must use
+# for its entry point, so every submission directory has one.
+ENTRY_POINT = "hello_world.py"
 
-def build(submission_path):
-    # "correctness" -- mechanical: run the submission, check its stdout
-    # exactly. .python() and .match_stdout() only record Steps here;
-    # nothing actually runs until exercise.run() below.
-    correctness = RunMarker(submission_path, criterion="correctness")
-    correctness.python().match_stdout(
+
+def build(submission_dir):
+    """One RunMarker per rubric criterion, each scoring its own slice
+    of the submission in submission_dir. A RunMarker builds up a list
+    of steps to perform; nothing actually runs until the Exercise
+    returned here is run."""
+
+    # Correctness is checked mechanically: run the entry point and
+    # compare its stdout exactly.
+    correctness = RunMarker(submission_dir, criterion="correctness")
+    correctness.python(ENTRY_POINT).match_stdout(
         "Hello World\n", score_out_of=10, score_matches=10, score_does_not_match=0
     )
 
-    # "style" -- judgement, deferred until run()'s second pass. Its own
-    # .python() step re-runs the same submission under its own
-    # RunContext -- never shared with "correctness"'s, see notes.org --
-    # purely so the question below can quote its own stdout.
-    style = RunMarker(submission_path, criterion="style")
-    style.python().ask_for_score(
-        lambda ctx: "Style, given stdout {!r} -- score out of 2? ".format(
-            ctx.completed_process.stdout
+    # Style (comments, naming, structure) can't be checked
+    # mechanically, so this asks a human marker instead, quoting the
+    # entry point's own source so they don't have to go find it
+    # themselves. No .python() step is needed here -- judging style
+    # doesn't require running anything.
+    style = RunMarker(submission_dir, criterion="style")
+    source_path = os.path.join(submission_dir, ENTRY_POINT)
+    style.ask_for_score(
+        lambda ctx: "Style, given source:\n{}\n-- score out of 2? ".format(
+            open(source_path).read()
         ),
         out_of=2,
     )

@@ -79,19 +79,27 @@ class Marker:
         return sum(step.out_of for step in self.steps if step.out_of is not None)
 
 
-class FileMarker(Marker):
-    def __init__(self, filename, criterion=None):
+class DirectoryMarker(Marker):
+    """A Marker whose checks run against a submission *directory* --
+    most student submissions pre-define their own entry-point filename
+    (the assignment's own convention, e.g. "hello_world.py"), so a
+    Marker is pointed at the directory once and each step says which
+    file within it to act on, rather than a Marker being tied to one
+    fixed file."""
+
+    def __init__(self, directory, criterion=None):
         super().__init__(criterion=criterion)
-        self.filename = filename
+        self.directory = directory
 
 
-class RunMarker(FileMarker):
-    def python(self, *args, **kwargs):
+class RunMarker(DirectoryMarker):
+    def python(self, entry_point, *args, **kwargs):
         def action(ctx):
             ctx.completed_process = subprocess.run(
-                ["python3", self.filename, *args],
+                ["python3", entry_point, *args],
                 capture_output=True,
                 text=True,
+                cwd=self.directory,
                 **kwargs,
             )
             return None

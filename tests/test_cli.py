@@ -13,9 +13,9 @@ ARB_PY = textwrap.dedent(
 
     RUBRIC_TOML = os.path.join(os.path.dirname(__file__), "rubric.toml")
 
-    def build(submission_path):
-        marker = RunMarker(submission_path, criterion="correctness")
-        marker.python().match_stdout("A\\n", 5, 5, 0)
+    def build(submission_dir):
+        marker = RunMarker(submission_dir, criterion="correctness")
+        marker.python("a.py").match_stdout("A\\n", 5, 5, 0)
         return Exercise(marker)
     """
 )
@@ -56,11 +56,11 @@ def _write(tmp_path, name, output):
 def test_cli_runs_the_exercise_and_prints_results(tmp_path):
     (tmp_path / "arb.py").write_text(ARB_PY)
     (tmp_path / "rubric.toml").write_text(CONSISTENT_RUBRIC_TOML)
-    script = _write(tmp_path, "a.py", "A")
+    _write(tmp_path, "a.py", "A")
 
     runner = CliRunner()
     result = runner.invoke(
-        cli, ["--arb", str(tmp_path / "arb.py"), str(script)]
+        cli, ["--arb", str(tmp_path / "arb.py"), str(tmp_path)]
     )
 
     assert result.exit_code == 0, result.output
@@ -70,11 +70,11 @@ def test_cli_runs_the_exercise_and_prints_results(tmp_path):
 def test_cli_fails_fast_on_rubric_inconsistency(tmp_path):
     (tmp_path / "arb.py").write_text(ARB_PY)
     (tmp_path / "rubric.toml").write_text(INCONSISTENT_RUBRIC_TOML)
-    script = _write(tmp_path, "a.py", "A")
+    _write(tmp_path, "a.py", "A")
 
     runner = CliRunner()
     result = runner.invoke(
-        cli, ["--arb", str(tmp_path / "arb.py"), str(script)]
+        cli, ["--arb", str(tmp_path / "arb.py"), str(tmp_path)]
     )
 
     assert result.exit_code != 0
