@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from typing import Callable, List, Optional, Union
 import subprocess
 
+from tent_pole.rubric import load_rubric_toml
+
 
 @dataclass
 class Result:
@@ -28,6 +30,13 @@ class Question:
 class Step:
     mechanical: bool
     action: Callable[["RunContext"], Optional[Union[Result, Question]]]
+    ## The points this step can award, known up front from its own
+    ## builder-method arguments -- None for a step that sets up ctx for a
+    ## later step rather than scoring anything itself (e.g. python()).
+    ## Letting Marker.max_score() read this directly means a Marker's
+    ## total is known statically, without running anything -- needed for
+    ## Exercise.check_consistent_with_rubric_toml below.
+    out_of: Optional[float] = None
 
 
 class RunContext:
@@ -46,22 +55,33 @@ class RunContext:
 
 
 class Marker:
-    def __init__(self):
+    def __init__(self, criterion=None):
+        ## Which tent-pole .rubric.toml criterion (by its own "id", not
+        ## a Canvas id -- those aren't stable, see tent-pole's
+        ## rubric.py) this Marker's results count towards. None means
+        ## "not tied to a criterion", e.g. a Marker used standalone,
+        ## outside Exercise.check_consistent_with_rubric_toml.
+        self.criterion = criterion
         self.steps: List[Step] = []
         self.results: List[Result] = []
 
-    def _step(self, mechanical, action):
-        self.steps.append(Step(mechanical, action))
+    def _step(self, mechanical, action, out_of=None):
+        self.steps.append(Step(mechanical, action, out_of))
         return self
 
     def result(self, result):
         self.results.append(result)
         return self
 
+    def max_score(self):
+        """Total points this Marker can award, from its own steps'
+        declared out_of values -- static, no step is actually run."""
+        return sum(step.out_of for step in self.steps if step.out_of is not None)
+
 
 class FileMarker(Marker):
-    def __init__(self, filename):
-        super().__init__()
+    def __init__(self, filename, criterion=None):
+        super().__init__(criterion=criterion)
         self.filename = filename
 
 
@@ -87,7 +107,7 @@ class RunMarker(FileMarker):
                 feedback=f"stdout {'matches' if ok else 'does not match'} {match!r}",
             )
 
-        return self._step(True, action)
+        return self._step(True, action, out_of=score_out_of)
 
     def ask_for_score(self, question, out_of):
         """``question`` may be a plain string, or a callable taking the
@@ -100,7 +120,7 @@ class RunMarker(FileMarker):
             text = question(ctx) if callable(question) else question
             return Question(text, out_of)
 
-        return self._step(False, action)
+        return self._step(False, action, out_of=out_of)
 
 
 class Exercise:
@@ -122,3 +142,47 @@ class Exercise:
             question = step.action(ctx)
             marker.result(ask_interactively(question))
         return self
+
+    def check_consistent_with_rubric_toml(self, path):
+        """Cross-check this Exercise's own Markers against a tent-pole
+        .rubric.toml's criteria -- the arbiter-side analogue of
+        tent-pole's own points-drift linter (tent_pole/check.py), but
+        catching drift between what arbiter actually scores and what's
+        been defined (and pushed) as the Canvas-side rubric, rather than
+        drift within the .rubric.toml alone.
+
+        Static: reads every Marker's own declared out_of (via
+        max_score()), never runs anything. Returns a list of plain-string
+        problems -- empty means consistent -- rather than raising, so a
+        caller can decide whether a mismatch is fatal.
+        """
+        parsed = load_rubric_toml(path)
+        criteria = {c["id"]: c["points"] for c in parsed.get("criteria", [])}
+
+        problems = []
+        seen = set()
+        for marker in self.markers:
+            if marker.criterion is None:
+                continue
+            seen.add(marker.criterion)
+            if marker.criterion not in criteria:
+                problems.append(
+                    "marker for {!r} has no matching criterion in {}".format(
+                        marker.criterion, path
+                    )
+                )
+                continue
+            rubric_points = criteria[marker.criterion]
+            marker_points = marker.max_score()
+            if marker_points != rubric_points:
+                problems.append(
+                    "{!r}: marker scores out of {}, rubric criterion is out of {}".format(
+                        marker.criterion, marker_points, rubric_points
+                    )
+                )
+
+        for criterion_id in sorted(set(criteria) - seen):
+            problems.append(
+                "rubric criterion {!r} has no matching marker".format(criterion_id)
+            )
+        return problems

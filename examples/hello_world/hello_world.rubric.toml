@@ -1,0 +1,50 @@
+## The rubric this example's arb.py is checked against -- not pushed
+## anywhere, just a local stand-in for the real .rubric.toml a
+## tent-pole course would push to Canvas (see
+## tent-peg/examples/hello_world/hello_world.rubric.toml for the real
+## one this is modelled on).
+
+[assignment]
+title = "Hello World"
+description = "hello-world-description.md"
+points_possible = 12
+submission_types = ["online_upload"]
+published = false
+
+[[criteria]]
+id = "correctness"
+description = "Correctness"
+long_description = """
+Running the submitted Python file prints exactly "Hello World",
+followed by a newline, and nothing else.
+"""
+points = 10
+
+[[criteria.ratings]]
+id = "full"
+description = "Prints exactly \"Hello World\""
+points = 10
+
+[[criteria.ratings]]
+id = "none"
+description = "Does not print \"Hello World\" exactly"
+points = 0
+
+[[criteria]]
+id = "style"
+description = "Style"
+long_description = """
+Readable code: sensible naming, no dead code, no unnecessary
+complexity for what the task asks.
+"""
+points = 2
+
+[[criteria.ratings]]
+id = "full"
+description = "Readable"
+points = 2
+
+[[criteria.ratings]]
+id = "none"
+description = "Not readable"
+points = 0
