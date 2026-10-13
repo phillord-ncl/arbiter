@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "tent-arbiter"
+version = "0.1.0"
+description = ""
+authors = ["Phillip Lord"]
+
+[tool.poetry.dependencies]
+python = ">=3.14,<4.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3"
