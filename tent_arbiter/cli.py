@@ -1,0 +1,62 @@
+"""The `tent-arbiter` command -- loads an arb.py (the doit/dodo.py-style
+convention: look for it in the current directory unless told otherwise),
+calls its build(submission) to get an Exercise, checks it against its own
+rubric if it names one, runs it, and prints the results. Everything an
+individual arb.py used to do in its own __main__ block belongs here
+instead, so an arb.py only ever defines the Exercise itself.
+"""
+
+import importlib.util
+
+import click
+
+from .core import Result
+
+
+def _load_arb(path):
+    spec = importlib.util.spec_from_file_location("arb", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _default_ask_interactively(question):
+    answer = input(question.question)
+    score = float(answer) if answer.strip() else 0.0
+    return Result(out_of=question.out_of, score=score, feedback="marker-entered")
+
+
+@click.command(help="Run an arb.py's Exercise against one submission.")
+@click.argument("submission")
+@click.option(
+    "--arb",
+    "arb_path",
+    default="arb.py",
+    type=click.Path(exists=True, dir_okay=False),
+    help="Path to the arb.py defining the Exercise (default: arb.py in the "
+         "current directory).",
+)
+def cli(submission, arb_path):
+    module = _load_arb(arb_path)
+    exercise = module.build(submission)
+
+    rubric_toml = getattr(module, "RUBRIC_TOML", None)
+    if rubric_toml is not None:
+        problems = exercise.check_consistent_with_rubric_toml(rubric_toml)
+        if problems:
+            raise click.ClickException(
+                "{} is inconsistent with {}:\n{}".format(
+                    arb_path, rubric_toml, "\n".join(problems)
+                )
+            )
+
+    ask_interactively = getattr(module, "ask_interactively", _default_ask_interactively)
+    exercise.run(ask_interactively=ask_interactively)
+
+    for marker in exercise.markers:
+        for result in marker.results:
+            click.echo(
+                "{}: {}/{} -- {}".format(
+                    marker.criterion, result.score, result.out_of, result.feedback
+                )
+            )

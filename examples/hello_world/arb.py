@@ -2,22 +2,24 @@
 judgement -- for the "print Hello World" task, checked against
 hello_world.rubric.toml before it runs.
 
-Run it against the correct submission:
+Run it against the correct submission (from this directory, so
+tent-arbiter finds this file by its default arb.py convention):
 
-    poetry run python examples/hello_world/arb.py \\
-        examples/hello_world/submissions/correct/hello_world.py
+    poetry run tent-arbiter submissions/correct/hello_world.py
 
 ...and against the broken one, to see the mechanical check actually
 fail (it will still ask the style question -- the two are independent
 criteria, each scored on its own):
 
-    poetry run python examples/hello_world/arb.py \\
-        examples/hello_world/submissions/broken/hello_world.py
+    poetry run tent-arbiter submissions/broken/hello_world.py
+
+tent-arbiter calls build() below with the submission path, checks the
+result against RUBRIC_TOML, runs it, and prints each Marker's results
+-- all of which used to be this file's own __main__ block.
 """
 import os
-import sys
 
-from tent_arbiter.core import Exercise, Result, RunMarker
+from tent_arbiter.core import Exercise, RunMarker
 
 
 RUBRIC_TOML = os.path.join(os.path.dirname(__file__), "hello_world.rubric.toml")
@@ -45,30 +47,3 @@ def build(submission_path):
     )
 
     return Exercise(correctness, style)
-
-
-def ask_interactively(question):
-    answer = input(question.question)
-    score = float(answer) if answer.strip() else 0.0
-    return Result(out_of=question.out_of, score=score, feedback="marker-entered")
-
-
-if __name__ == "__main__":
-    exercise = build(sys.argv[1])
-
-    # Static -- reads the Markers' own declared out_of values, runs
-    # nothing. Catches drift between what this script actually scores
-    # and what the rubric says, before wasting anyone's time running it.
-    problems = exercise.check_consistent_with_rubric_toml(RUBRIC_TOML)
-    if problems:
-        sys.exit("Inconsistent with {}:\n{}".format(RUBRIC_TOML, "\n".join(problems)))
-
-    exercise.run(ask_interactively=ask_interactively)
-
-    for marker in exercise.markers:
-        for result in marker.results:
-            print(
-                "{}: {}/{} -- {}".format(
-                    marker.criterion, result.score, result.out_of, result.feedback
-                )
-            )
