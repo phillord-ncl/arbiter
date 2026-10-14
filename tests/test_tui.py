@@ -60,5 +60,6 @@ def test_question_tab_shows_the_question_text(tmp_path):
             assert app.query_one(TabbedContent).active == "question"
             texts = [str(w.render()) for w in app.query("Static")]
             assert any("Is the style good?" in t for t in texts)
+            assert any(t.startswith("style: out of 5") for t in texts)
 
     asyncio.run(go())

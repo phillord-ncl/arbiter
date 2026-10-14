@@ -28,7 +28,12 @@ def _header_text(question):
 
 
 def _question_text(question):
-    text = question.question.rstrip()
+    session = question.session
+    criterion = session.criterion if session and session.criterion else None
+    heading = "{}out of {}".format(
+        "{}: ".format(criterion) if criterion else "", question.out_of
+    )
+    text = heading + "\n\n" + question.question.rstrip()
     if question.undecided:
         text += "\n\n" + UNDECIDED_NOTE
     return text

@@ -55,12 +55,12 @@ class Question:
     question: str
     out_of: float
     context: List[ContextItem] = field(default_factory=list)
-    ## True when the automatic checks could not decide and this question
-    ## took over (a step after or_else()); a UI may mention it, quietly.
-    undecided: bool = False
     ## Set by Exercise.run just before the question is asked, not by the
     ## step that builds it -- a step knows nothing of the wider session.
     session: Optional[Session] = None
+    ## True when the automatic checks could not decide and this question
+    ## took over (a step after or_else()); a UI may mention it, quietly.
+    undecided: bool = False
 
 
 class _Undecided:
