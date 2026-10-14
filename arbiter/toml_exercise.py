@@ -57,7 +57,8 @@ human decide, shown what the check found::
     out_of = 1                           #   git_log_matches,
                                          #   note_unexpected_hidden
     # file_contains / files_match:  files = [...], pattern = "regexp"
-    # word_count:     files = [...], low = 300, high = 500, tolerance = 0.1
+    # word_count:     files = [...], low = 300, high = 500, over = 0.1
+    #                 (under / over: fraction allowed below low / above high)
     # git_commit_count:  at_least = 4
     # git_log_matches:   pattern = "regexp", messages = true, diffs = true
     # note_unexpected_hidden:  allowed = [".git", ".gitignore"]  (no out_of)
@@ -124,7 +125,7 @@ CHECKS = {
     "file_contains": lambda m, s: m.file_contains(s["out_of"], _files(s), s["pattern"]),
     "files_match": lambda m, s: m.files_match(s["out_of"], _files(s), s["pattern"]),
     "word_count": lambda m, s: m.word_count(
-        s["out_of"], _files(s), s["low"], s["high"], s.get("tolerance", 0.0)
+        s["out_of"], _files(s), s["low"], s["high"], s.get("under", 0.0), s.get("over", 0.0)
     ),
     "git_commit_count": lambda m, s: m.git_commit_count(s["out_of"], s["at_least"]),
     "git_log_matches": lambda m, s: m.git_log_matches(

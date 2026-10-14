@@ -13,7 +13,7 @@ or can be a first pass that a person may overturn.
 | `file_exists` | a file matches any of `files` |
 | `file_contains` | a file matching `files` has text matching `pattern` (ignoring case) |
 | `files_match` | any line of any file matching `files` matches `pattern` |
-| `word_count` | the words in the files matching `files` are from `low` to `high`, widened by `tolerance` (0.1 is 10%) at both ends |
+| `word_count` | the words in the files matching `files` are from `low` to `high`, widened by `under` below `low` and `over` above `high` (0.1 is 10%) |
 | `git_commit_count` | the history has at least `at_least` commits |
 | `git_log_matches` | a commit message (`messages`) or changed line (`diffs`) matches `pattern`, ignoring case |
 | `note_unexpected_hidden` | (scores nothing) notes hidden files and directories such as `.venv`, other than `allowed` (default `.git`, `.gitignore`) |
@@ -39,7 +39,7 @@ type = "word_count"
 files = ["doc/*.md"]
 low = 300
 high = 500
-tolerance = 0.1
+over = 0.1
 out_of = 1
 
 [[marker.step]]

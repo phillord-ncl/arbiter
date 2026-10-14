@@ -164,15 +164,15 @@ def test_checks_chain_with_or_else(tmp_path):
     assert "message matches" in results[0].feedback
 
 
-def test_word_count_with_tolerance_and_human_fallback(tmp_path):
+def test_word_count_with_allowance_and_human_fallback(tmp_path):
     (tmp_path / "doc").mkdir()
     (tmp_path / "doc" / "r.md").write_text("word " * 520)
-    results, _ = _score(tmp_path, lambda m: m.word_count(1, "doc/*.md", 300, 500, 0.1))
+    results, _ = _score(tmp_path, lambda m: m.word_count(1, "doc/*.md", 300, 500, over=0.1))
     assert results[0].score == 1
     (tmp_path / "doc" / "r.md").write_text("word " * 600)
 
     def build(m):
-        m.word_count(1, "doc/*.md", 300, 500, 0.1)
+        m.word_count(1, "doc/*.md", 300, 500, over=0.1)
         m.or_else()
         m.ask_for_score("?", 1)
 
@@ -272,7 +272,7 @@ type = "word_count"
 files = ["doc/*.md"]
 low = 300
 high = 500
-tolerance = 0.1
+over = 0.1
 out_of = 1
 [[marker.step]]
 type = "git_commit_count"
@@ -297,3 +297,16 @@ def test_toml_names_the_checks_in_its_error():
 
     with pytest.raises(ArbTomlError, match="file_exists"):
         _add_step(RunMarker("."), {"type": "nonsense"}, "marker 1 step 1", ".")
+
+
+def test_word_count_over_allowance_does_not_widen_the_lower_end(tmp_path):
+    (tmp_path / "doc").mkdir()
+
+    def passes(words):
+        (tmp_path / "doc" / "r.md").write_text("word " * words)
+        results, _ = _score(
+            tmp_path, lambda m: m.word_count(1, "doc/*.md", 300, 500, over=0.1)
+        )
+        return results[0].score == 1
+
+    assert [passes(n) for n in (299, 300, 550, 551)] == [False, True, True, False]

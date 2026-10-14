@@ -45,16 +45,18 @@ def files_match(root, patterns, regexp):
     )
 
 
-def word_count(root, patterns, low, high, tolerance):
+def word_count(root, patterns, low, high, under, over):
     files = submission.find(root, *patterns)
     if not files:
         return False, "no file matching {}".format(" or ".join(patterns))
     count = sum(submission.word_count(submission.read(root, r)) for r in files)
     wanted = "{} to {}".format(low, high)
-    if tolerance:
-        wanted += " (+/- {:g}%)".format(tolerance * 100)
+    if under:
+        wanted += ", {:g}% under allowed".format(under * 100)
+    if over:
+        wanted += ", {:g}% over allowed".format(over * 100)
     message = "{} has {} words, wanted {}".format(", ".join(files), count, wanted)
-    return low * (1 - tolerance) <= count <= high * (1 + tolerance), message
+    return low * (1 - under) <= count <= high * (1 + over), message
 
 
 def _git(root, *args):

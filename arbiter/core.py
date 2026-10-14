@@ -295,14 +295,14 @@ class DirectoryMarker(Marker):
             out_of, lambda root: checks.files_match(root, _as_list(patterns), regexp)
         )
 
-    def word_count(self, out_of, patterns, low, high, tolerance=0.0):
+    def word_count(self, out_of, patterns, low, high, under=0.0, over=0.0):
         """Score ``out_of`` if the words in the files matching
         ``patterns`` number from ``low`` to ``high``, widened by
-        ``tolerance`` (0.1 is 10%) at both ends."""
+        ``under`` below ``low`` and ``over`` above ``high`` (0.1 is 10%)."""
         return self._check(
             out_of,
             lambda root: checks.word_count(
-                root, _as_list(patterns), low, high, tolerance
+                root, _as_list(patterns), low, high, under, over
             ),
         )
 
