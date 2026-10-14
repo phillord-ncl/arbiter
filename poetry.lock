@@ -587,7 +587,7 @@ toml = "^0.10.1"
 
 [package.source]
 type = "directory"
-url = "../../../tent-pole/main"
+url = "../../tent-pole/main"
 
 [[package]]
 name = "toml"
@@ -634,4 +634,4 @@ zstd = ["backports-zstd (>=1.0.0) ; python_version < \"3.14\""]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.14,<4.0"
-content-hash = "9887d4f8b130aed6e55ee39e95f7da62a708631388638c0725766d52a55d7f55"
+content-hash = "023f80235327beabc5c13cec00710135036fc69e73d515df848003a531572f70"
