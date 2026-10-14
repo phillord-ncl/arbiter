@@ -106,16 +106,18 @@ class RunMarker(DirectoryMarker):
 
         return self._step(True, action)
 
-    def match_stdout(self, match, score_out_of, score_matches, score_does_not_match):
-        def action(ctx):
-            ok = ctx.completed_process.stdout == match
-            return Result(
-                out_of=score_out_of,
-                score=score_matches if ok else score_does_not_match,
-                feedback=f"stdout {'matches' if ok else 'does not match'} {match!r}",
-            )
+    def match_stdout(self, out_of, *matchers):
+        """Score the script's stdout with the first of ``matchers`` (see
+        tent_arbiter.matchers) that matches it. If none do, scores 0."""
 
-        return self._step(True, action, out_of=score_out_of)
+        def action(ctx):
+            stdout = ctx.completed_process.stdout
+            for matcher in matchers:
+                if matcher.matches(stdout):
+                    return matcher.result(out_of)
+            return Result(out_of=out_of, score=0, feedback="stdout did not match")
+
+        return self._step(True, action, out_of=out_of)
 
     def ask_for_score(self, question, out_of):
         """``question`` may be a plain string, or a callable taking the

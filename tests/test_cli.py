@@ -10,12 +10,13 @@ ARB_PY = textwrap.dedent(
     import os
 
     from tent_arbiter.core import Exercise, RunMarker
+    from tent_arbiter.matchers import Exact
 
     RUBRIC_TOML = os.path.join(os.path.dirname(__file__), "rubric.toml")
 
     def build(submission_dir):
         marker = RunMarker(submission_dir, criterion="correctness")
-        marker.python("a.py").match_stdout("A\\n", 5, 5, 0)
+        marker.python("a.py").match_stdout(5, Exact("A\\n", "output correct", 5))
         return Exercise(marker)
     """
 )

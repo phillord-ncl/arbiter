@@ -13,6 +13,7 @@ style question is still asked -- each criterion is scored on its own):
 import os
 
 from tent_arbiter.core import Exercise, RunMarker
+from tent_arbiter.matchers import Exact, SubString
 
 
 # tent-arbiter reads this before running the Exercise below, and
@@ -35,7 +36,9 @@ def build(submission_dir):
     # compare its stdout exactly.
     correctness = RunMarker(submission_dir, criterion="correctness")
     correctness.python(ENTRY_POINT).match_stdout(
-        "Hello World\n", score_out_of=10, score_matches=10, score_does_not_match=0
+        10,
+        Exact("Hello World\n", "Your program outputs Hello World as required", 10),
+        SubString("Hello", "Part of the output is right", 5),
     )
 
     # Style (comments, naming, structure) can't be checked
