@@ -411,21 +411,12 @@ def _as_list(patterns):
 
 class RunMarker(DirectoryMarker):
     def _submission_files(self):
-        """The submission's own files, as path context items (not our own
-        results dump, nor bytecode caches)."""
-        items = []
-        for root, dirs, files in os.walk(self.directory):
-            dirs[:] = sorted(
-                d for d in dirs if d != "__pycache__" and not marker_scripts.is_ours(d)
-            )
-            for name in sorted(files):
-                if name.startswith("arb-results.") or marker_scripts.is_ours(name):
-                    continue
-                path = os.path.join(root, name)
-                items.append(
-                    ContextItem(os.path.relpath(path, self.directory), path=path)
-                )
-        return items
+        """The student's own files, as path context items (see
+        arbiter.submission.walk for what is left out)."""
+        return [
+            ContextItem(rel, path=os.path.join(self.directory, rel))
+            for rel in submission.walk(self.directory)
+        ]
 
     def python(self, entry_point, *args, venv=False, **kwargs):
         """Run a script and capture its output. With ``venv=True`` it runs
