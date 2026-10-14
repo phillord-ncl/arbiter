@@ -6,8 +6,9 @@ the whole tree: every mechanical step first, in document order within each
 ``Marker``; only then every queued judgement step, one at a time.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable, List, Optional, Union
+import os
 import subprocess
 
 from tent_pole.rubric import load_rubric_toml
@@ -22,9 +23,20 @@ class Result:
 
 
 @dataclass
+class ContextItem:
+    """One titled block shown alongside a question: literal ``text``, or
+    the ``path`` of a file for a viewer to display."""
+
+    title: str
+    text: Optional[str] = None
+    path: Optional[str] = None
+
+
+@dataclass
 class Question:
     question: str
     out_of: float
+    context: List[ContextItem] = field(default_factory=list)
 
 
 class _Undecided:
@@ -143,6 +155,21 @@ class DirectoryMarker(Marker):
 
 
 class RunMarker(DirectoryMarker):
+    def _submission_files(self):
+        """The submission's own files, as path context items (not our own
+        results dump, nor bytecode caches)."""
+        items = []
+        for root, dirs, files in os.walk(self.directory):
+            dirs[:] = sorted(d for d in dirs if d != "__pycache__")
+            for name in sorted(files):
+                if name.startswith("arb-results."):
+                    continue
+                path = os.path.join(root, name)
+                items.append(
+                    ContextItem(os.path.relpath(path, self.directory), path=path)
+                )
+        return items
+
     def python(self, entry_point, *args, **kwargs):
         def action(ctx):
             ctx.completed_process = subprocess.run(
@@ -185,9 +212,24 @@ class RunMarker(DirectoryMarker):
         until the second pass.
         """
 
+        after_or_else = self._next_is_fallback
+
         def action(ctx):
             text = question(ctx) if callable(question) else question
-            return Question(text, out_of)
+            context = []
+            if after_or_else:
+                context.append(
+                    ContextItem(
+                        "Why you are being asked",
+                        text="The automatic checks could not decide this one.",
+                    )
+                )
+            process = getattr(ctx, "completed_process", None)
+            if process is not None:
+                context.append(ContextItem("stdout", text=process.stdout))
+                context.append(ContextItem("stderr", text=process.stderr))
+            context.extend(self._submission_files())
+            return Question(text, out_of, context)
 
         return self._step(False, action, out_of=out_of)
 

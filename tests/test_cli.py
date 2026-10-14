@@ -80,3 +80,15 @@ def test_cli_fails_fast_on_rubric_inconsistency(tmp_path):
 
     assert result.exit_code != 0
     assert "inconsistent" in result.output.lower()
+
+
+def test_default_prompt_prints_context(monkeypatch, capsys):
+    from tent_arbiter.cli import _default_ask_interactively
+    from tent_arbiter.core import ContextItem, Question
+
+    monkeypatch.setattr("builtins.input", lambda prompt: "3")
+    question = Question("score? ", 5, [ContextItem("stdout", text="hello\n")])
+    result = _default_ask_interactively(question)
+    assert result.score == 3
+    out = capsys.readouterr().out
+    assert "--- stdout" in out and "hello" in out

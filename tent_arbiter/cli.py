@@ -25,6 +25,10 @@ def _load_arb(path):
 
 
 def _default_ask_interactively(question):
+    for item in question.context:
+        click.echo("--- {}".format(item.title))
+        if item.text is not None:
+            click.echo(item.text)
     answer = input(question.question)
     score = float(answer) if answer.strip() else 0.0
     return Result(out_of=question.out_of, score=score, feedback="marker-entered")

@@ -185,3 +185,43 @@ def test_check_consistent_with_rubric_toml_flags_a_criterion_with_no_marker(tmp_
 
     [problem] = Exercise(correctness).check_consistent_with_rubric_toml(rubric_path)
     assert "style" in problem
+
+
+def test_question_context_has_output_and_files(tmp_path):
+    script = tmp_path / "s.py"
+    script.write_text("import sys\nprint('out')\nprint('err', file=sys.stderr)\n")
+    (tmp_path / "arb-results.toml").write_text("")
+    marker = RunMarker(str(tmp_path))
+    marker.python(script.name).ask_for_score("q", 5)
+    asked = []
+
+    def ask(question):
+        asked.append(question)
+        return Result(out_of=question.out_of, score=0, feedback="")
+
+    Exercise(marker).run(ask_interactively=ask)
+    context = {item.title: item for item in asked[0].context}
+    assert context["stdout"].text == "out\n"
+    assert context["stderr"].text == "err\n"
+    assert context["s.py"].path == str(script)
+    assert "arb-results.toml" not in context
+    assert "Why you are being asked" not in context
+
+
+def test_question_after_or_else_says_why(tmp_path):
+    from tent_arbiter.matchers import Exact
+
+    script = tmp_path / "s.py"
+    script.write_text("print('x')\n")
+    marker = RunMarker(str(tmp_path))
+    marker.python(script.name).match_stdout(
+        5, Exact("nope", "exact", 5)
+    ).or_else().ask_for_score("q", 5)
+    asked = []
+
+    def ask(question):
+        asked.append(question)
+        return Result(out_of=question.out_of, score=0, feedback="")
+
+    Exercise(marker).run(ask_interactively=ask)
+    assert asked[0].context[0].title == "Why you are being asked"
