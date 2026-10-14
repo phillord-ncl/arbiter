@@ -238,7 +238,7 @@ class RunMarker(DirectoryMarker):
             if after_or_else:
                 context.append(
                     ContextItem(
-                        "Why you are being asked",
+                        "Question",
                         text="The automatic checks could not decide this one.",
                     )
                 )
