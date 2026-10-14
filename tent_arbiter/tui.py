@@ -79,8 +79,11 @@ class QuestionApp(App):
 
     def action_open_file(self):
         item = self._current_item()
-        if self.viewer is None or item is None or item.path is None:
-            self.notify("No viewer configured, or this tab is not a file")
+        if self.viewer is None:
+            self.notify("No viewer configured (see docs/viewer.md)")
+            return
+        if item is None or item.path is None:
+            self.notify("This tab is not a file; switch to a file's tab first")
             return
         self.viewer.open_file(item.path)
 
