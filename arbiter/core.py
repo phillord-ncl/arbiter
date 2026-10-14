@@ -11,6 +11,7 @@ from typing import Callable, List, Optional, Tuple, Union
 import os
 import subprocess
 
+from arbiter import scripts as marker_scripts
 from tent_pole.rubric import load_rubric_toml
 
 
@@ -55,6 +56,10 @@ class Session:
     ## whole assignment's description. Either may be None.
     task: Optional[str] = None
     assignment: Optional[str] = None
+    ## The submission directory, and the marker-* commands that can be run
+    ## in it (empty if the Exercise uses none).
+    directory: Optional[str] = None
+    commands: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -228,9 +233,11 @@ class RunMarker(DirectoryMarker):
         results dump, nor bytecode caches)."""
         items = []
         for root, dirs, files in os.walk(self.directory):
-            dirs[:] = sorted(d for d in dirs if d != "__pycache__")
+            dirs[:] = sorted(
+                d for d in dirs if d != "__pycache__" and not marker_scripts.is_ours(d)
+            )
             for name in sorted(files):
-                if name.startswith("arb-results."):
+                if name.startswith("arb-results.") or marker_scripts.is_ours(name):
                     continue
                 path = os.path.join(root, name)
                 items.append(
@@ -238,10 +245,23 @@ class RunMarker(DirectoryMarker):
                 )
         return items
 
-    def python(self, entry_point, *args, **kwargs):
+    def python(self, entry_point, *args, venv=False, **kwargs):
+        """Run a script and capture its output. With ``venv=True`` it runs
+        through ``marker-python``, so in the submission's own venv with its
+        requirements installed -- which needs the Exercise's scripts to
+        have been written (``Exercise.prepare``)."""
+
         def action(ctx):
+            if venv:
+                command = [
+                    marker_scripts.script_path(self.directory, "marker-python"),
+                    entry_point,
+                    *args,
+                ]
+            else:
+                command = ["python3", entry_point, *args]
             ctx.completed_process = subprocess.run(
-                ["python3", entry_point, *args],
+                command,
                 capture_output=True,
                 text=True,
                 cwd=self.directory,
@@ -306,6 +326,23 @@ class Exercise:
     def __init__(self, *markers):
         self.markers = list(markers)
         self.assignment_text = None
+        ## Whether to write marker-* scripts into each submission, which
+        ## extra ones (marker_scripts.Script), and the venv's Python version.
+        self.use_scripts = False
+        self.scripts = []
+        self.python_version = None
+
+    def all_scripts(self):
+        return marker_scripts.BUILTIN + self.scripts
+
+    def prepare(self, directory):
+        """Write the marker-* scripts into ``directory``, if this Exercise
+        uses them. Raises ``arbiter.scripts.ScriptClash`` (writing nothing)
+        if the submission already has something of that name."""
+        if self.use_scripts:
+            marker_scripts.write_scripts(
+                directory, self.all_scripts(), self.python_version
+            )
 
     def apply_rubric(self, path):
         """Take what a marker is called, and what the student was asked,
@@ -354,11 +391,12 @@ class Exercise:
             for name in names
         ]
 
-    def run(self, ask_interactively, checkpoint=None, label=""):
+    def run(self, ask_interactively, checkpoint=None, label="", directory=None):
         """``checkpoint``, if given, is called with this Exercise after the
         mechanical pass and after every human answer, so results can be
         saved as they happen rather than only at the end. ``label`` names
-        the submission in each question's ``session``."""
+        the submission, and ``directory`` is where it is, in each question's
+        ``session``."""
         questions = []  # [(marker, step, ctx)], deferred to the second pass
         for marker in self.markers:
             ctx = RunContext()
@@ -395,6 +433,8 @@ class Exercise:
                 [(m.name, r) for m in self.markers for r in m.results],
                 marker.task_text,
                 self.assignment_text,
+                directory,
+                [s.name for s in self.all_scripts()] if self.use_scripts else [],
             )
             answer = ask_interactively(question)
             answer.decided_by = "human"

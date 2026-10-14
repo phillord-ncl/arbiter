@@ -5,6 +5,15 @@ output with matchers, ask a human about the rest. Anything it cannot say
 still needs an ``arb.py``. Layout::
 
     rubric = "greeting.rubric.toml"      # optional, relative to this file
+    python_version = "3.14"              # optional: the marker-venv's Python
+
+    [[script]]                           # optional: a marker-* command, run in
+    name = "marker-run"                  # the submission's venv, as well as the
+    command = ["python", "greeting.py"]  # always-present marker-python/-pip
+
+Declaring a ``[[script]]`` or ``python_version``, or a step with
+``venv = true``, makes arbiter write the marker-* scripts into each
+submission before marking.
 
     [[marker]]
     criterion = "correctness"            # a .rubric.toml criterion id
@@ -19,6 +28,7 @@ still needs an ``arb.py``. Layout::
     type = "python"                      # entry point, in the submission
     entry_point = "greeting.py"
     args = ["Ada"]                       # optional
+    venv = true                          # optional: run in marker-venv
 
     [[marker.step]]
     type = "match_stdout"
@@ -48,6 +58,7 @@ import tomllib
 
 from arbiter.core import Exercise, RunMarker
 from arbiter.matchers import Always, Exact, RegexpAny, SubString
+from arbiter.scripts import Script
 
 
 class ArbTomlError(Exception):
@@ -95,7 +106,11 @@ def _add_step(marker, spec, where, directory):
         marker.or_else()
     try:
         if kind == "python":
-            marker.python(spec["entry_point"], *spec.get("args", []))
+            marker.python(
+                spec["entry_point"],
+                *spec.get("args", []),
+                venv=spec.get("venv", False),
+            )
         elif kind == "match_stdout":
             matchers = [
                 _matcher(m, "{} match {}".format(where, i + 1))
@@ -138,7 +153,24 @@ def load_exercise(path, submission_dir):
     if not markers:
         raise ArbTomlError("{} defines no [[marker]]".format(path))
 
+    exercise = Exercise(*markers)
+    exercise.python_version = data.get("python_version")
+    for i, spec in enumerate(data.get("script", [])):
+        try:
+            exercise.scripts.append(Script(spec["name"], list(spec["command"])))
+        except KeyError as e:
+            raise ArbTomlError("script {}: missing {}".format(i + 1, e)) from None
+    exercise.use_scripts = bool(
+        exercise.scripts
+        or exercise.python_version
+        or any(
+            step.get("venv", False)
+            for spec in data.get("marker", [])
+            for step in spec.get("step", [])
+        )
+    )
+
     rubric = data.get("rubric")
     if rubric is not None:
         rubric = os.path.join(os.path.dirname(os.path.abspath(path)), rubric)
-    return Exercise(*markers), rubric
+    return exercise, rubric

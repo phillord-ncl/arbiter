@@ -8,7 +8,13 @@ says how to view a submission's files::
     close = "..."          # optional
 
 With no config (or no ``[viewer]``) there is no external viewer and the UI
-shows files itself.
+shows files itself. ``[terminal]`` says how to open a terminal in a
+submission::
+
+    [terminal]
+    open = "kitty --directory {dir}"
+
+With none, a platform default is guessed (see terminal.py).
 """
 
 import os
@@ -69,3 +75,21 @@ def load_viewer(path=None):
     if "open" not in viewer:
         raise ConfigError("{}: [viewer] needs an 'open' command".format(path))
     return Viewer(viewer["open"], viewer.get("close"))
+
+
+def load_terminal(path=None):
+    """The configured terminal command line (a string), or None."""
+    path = path or default_path()
+    try:
+        with open(path, "rb") as f:
+            data = tomllib.load(f)
+    except FileNotFoundError:
+        return None
+    except tomllib.TOMLDecodeError as e:
+        raise ConfigError("{}: {}".format(path, e)) from None
+    terminal = data.get("terminal")
+    if terminal is None:
+        return None
+    if "open" not in terminal:
+        raise ConfigError("{}: [terminal] needs an 'open' command".format(path))
+    return terminal["open"]

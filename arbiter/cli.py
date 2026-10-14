@@ -13,9 +13,10 @@ import sys
 
 import click
 
-from .config import ConfigError, load_viewer
+from .config import ConfigError, load_terminal, load_viewer
 from .core import UNDECIDED_NOTE, Result
 from .dump import FILENAME, FORMATS, Dumper
+from .scripts import ScriptClash
 from .toml_exercise import ArbTomlError, load_exercise
 
 
@@ -31,6 +32,13 @@ def _default_ask_interactively(question):
         click.echo("Task: {}".format(question.session.task))
     if question.undecided:
         click.echo(UNDECIDED_NOTE)
+    session = question.session
+    if session is not None and session.commands:
+        click.echo(
+            "In {}, you can run: {}".format(
+                session.directory, ", ".join(session.commands)
+            )
+        )
     for item in question.context:
         click.echo("--- {}".format(item.title))
         if item.text is not None:
@@ -68,7 +76,11 @@ def _choose_ask(tui):
             viewer = load_viewer()
         except ConfigError as e:
             raise click.ClickException(str(e))
-        return make_ask_interactively(viewer)
+        try:
+            terminal = load_terminal()
+        except ConfigError as e:
+            raise click.ClickException(str(e))
+        return make_ask_interactively(viewer, terminal)
     return _default_ask_interactively
 
 
@@ -144,12 +156,17 @@ def cli(submission, arb_path, output, also, tui):
     if output is not None:
         base = output[: -len(".toml")] if output.endswith(".toml") else output
     dumper = Dumper(base, submission, rubric_toml, also)
+    try:
+        exercise.prepare(submission)
+    except ScriptClash as e:
+        raise click.ClickException(str(e))
     # Write after every human answer, not just at the end, so a crash
     # mid-marking keeps what was already entered.
     exercise.run(
         ask_interactively=ask_interactively,
         checkpoint=dumper.write,
         label=os.path.basename(os.path.abspath(submission)),
+        directory=os.path.abspath(submission),
     )
     dumper.write(exercise, complete=True)
 

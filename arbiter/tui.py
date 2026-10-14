@@ -11,21 +11,25 @@ from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Footer, Input, Label, Static, TabbedContent, TabPane
 
 from .core import UNDECIDED_NOTE, Result
+from .terminal import TerminalError, open_terminal
 
 
 def _header_text(question):
     session = question.session
     if session is None:
         return "Marks available: {}".format(question.out_of)
-    return "\n".join(
-        [
-            "Student/Directory: {}".format(session.label or "(unknown)"),
-            "Criterion: {}".format(session.criterion or "(none)"),
-            "Marks so far: {} of {}   Question {} of {}".format(
-                session.score, session.out_of, session.position, session.total
-            ),
-        ]
-    )
+    lines = [
+        "Student/Directory: {}".format(session.label or "(unknown)"),
+        "Criterion: {}".format(session.criterion or "(none)"),
+        "Marks so far: {} of {}   Question {} of {}".format(
+            session.score, session.out_of, session.position, session.total
+        ),
+    ]
+    if session.commands:
+        lines.append(
+            "Ctrl-T opens a terminal; there run: {}".format(", ".join(session.commands))
+        )
+    return "\n".join(lines)
 
 
 def _marked_text(question):
@@ -79,12 +83,16 @@ class QuestionApp(App):
     BINDINGS = [
         Binding("ctrl+o", "open_file", "Open in viewer"),
         Binding("ctrl+x", "close_file", "Close in viewer"),
+        Binding("ctrl+t", "terminal", "Terminal"),
     ]
 
-    def __init__(self, question, viewer=None):
+    def __init__(self, question, viewer=None, terminal=None):
         super().__init__()
         self.question = question
         self.viewer = viewer
+        ## The configured ``[terminal] open`` command line, or None for a
+        ## platform default.
+        self.terminal = terminal
         self.result = None
 
     def compose(self) -> ComposeResult:
@@ -136,6 +144,16 @@ class QuestionApp(App):
         if self.viewer is not None and item is not None and item.path is not None:
             self.viewer.close_file(item.path)
 
+    def action_terminal(self):
+        session = self.question.session
+        if session is None or session.directory is None:
+            self.notify("No submission directory to open a terminal in")
+            return
+        try:
+            open_terminal(session.directory, self.terminal)
+        except TerminalError as e:
+            self.notify(str(e), severity="error")
+
     def on_input_submitted(self, event):
         if event.input.id == "score":
             self.query_one("#feedback").focus()
@@ -159,12 +177,12 @@ class QuestionApp(App):
         self.exit()
 
 
-def make_ask_interactively(viewer=None):
+def make_ask_interactively(viewer=None, terminal=None):
     """An ``ask_interactively`` hook that shows each question in a
     ``QuestionApp``. Quitting the app without answering stops marking."""
 
     def ask(question):
-        app = QuestionApp(question, viewer)
+        app = QuestionApp(question, viewer, terminal)
         app.run()
         if app.result is None:
             raise KeyboardInterrupt("question not answered")
