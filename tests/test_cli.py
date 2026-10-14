@@ -3,15 +3,15 @@ import textwrap
 
 from click.testing import CliRunner
 
-from tent_arbiter.cli import cli
+from arbiter.cli import cli
 
 
 ARB_PY = textwrap.dedent(
     """
     import os
 
-    from tent_arbiter.core import Exercise, RunMarker
-    from tent_arbiter.matchers import Exact
+    from arbiter.core import Exercise, RunMarker
+    from arbiter.matchers import Exact
 
     RUBRIC_TOML = os.path.join(os.path.dirname(__file__), "rubric.toml")
 
@@ -84,8 +84,8 @@ def test_cli_fails_fast_on_rubric_inconsistency(tmp_path):
 
 
 def test_default_prompt_prints_context(monkeypatch, capsys):
-    from tent_arbiter.cli import _default_ask_interactively
-    from tent_arbiter.core import ContextItem, Question
+    from arbiter.cli import _default_ask_interactively
+    from arbiter.core import ContextItem, Question
 
     monkeypatch.setattr("builtins.input", lambda prompt: "3")
     question = Question("score? ", 5, [ContextItem("stdout", text="hello\n")])
@@ -96,7 +96,7 @@ def test_default_prompt_prints_context(monkeypatch, capsys):
 
 
 def test_no_tui_and_non_terminal_use_the_plain_prompt():
-    from tent_arbiter.cli import _choose_ask, _default_ask_interactively
+    from arbiter.cli import _choose_ask, _default_ask_interactively
 
     assert _choose_ask(False) is _default_ask_interactively
     # Under pytest stdin is not a terminal.
@@ -105,6 +105,6 @@ def test_no_tui_and_non_terminal_use_the_plain_prompt():
 
 def test_tui_flag_builds_the_textual_hook():
     pytest.importorskip("textual")
-    from tent_arbiter.cli import _choose_ask, _default_ask_interactively
+    from arbiter.cli import _choose_ask, _default_ask_interactively
 
     assert _choose_ask(True) is not _default_ask_interactively

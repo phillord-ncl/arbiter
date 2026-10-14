@@ -2,7 +2,7 @@ import sys
 
 import pytest
 
-from tent_arbiter.config import ConfigError, Viewer, load_viewer
+from arbiter.config import ConfigError, Viewer, load_viewer
 
 
 def _write(tmp_path, text):

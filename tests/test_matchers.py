@@ -1,7 +1,7 @@
 import re
 
-from tent_arbiter.core import Result, RunMarker
-from tent_arbiter.matchers import Always, Exact, RegexpAny, SubString
+from arbiter.core import Result, RunMarker
+from arbiter.matchers import Always, Exact, RegexpAny, SubString
 
 
 def test_exact_requires_the_whole_text():
@@ -34,7 +34,7 @@ def _run(tmp_path, stdout, *matchers):
     script.write_text(f"print({stdout!r})\n")
     marker = RunMarker(str(tmp_path))
     marker.python(script.name).match_stdout(10, *matchers)
-    from tent_arbiter.core import Exercise
+    from arbiter.core import Exercise
 
     Exercise(marker).run(ask_interactively=None)
     return marker.results[0]
@@ -83,7 +83,7 @@ def _run_with_fallback(tmp_path, stdout, answer):
         asked.append(question)
         return Result(out_of=question.out_of, score=answer, feedback="human")
 
-    from tent_arbiter.core import Exercise
+    from arbiter.core import Exercise
 
     Exercise(marker).run(ask_interactively=ask)
     return marker, asked
@@ -137,7 +137,7 @@ def test_or_else_question_can_quote_the_output(tmp_path):
         asked.append(question.question)
         return Result(out_of=question.out_of, score=0, feedback="human")
 
-    from tent_arbiter.core import Exercise
+    from arbiter.core import Exercise
 
     Exercise(marker).run(ask_interactively=ask)
     assert asked == ["printed: surprise\n"]

@@ -1,4 +1,4 @@
-"""The `tent-arbiter` command -- loads an arb.py (the doit/dodo.py-style
+"""The `arbiter` command -- loads an arb.py (the doit/dodo.py-style
 convention: look for it in the current directory unless told otherwise),
 calls its build(submission) to get an Exercise, checks it against its own
 rubric if it names one, runs it, and prints the results. Everything an
@@ -54,7 +54,7 @@ def _choose_ask(tui):
         except ImportError:
             if wanted:
                 raise click.ClickException(
-                    "the terminal UI needs the tui extra: pip install 'tent-arbiter[tui]'"
+                    "the terminal UI needs the tui extra: pip install 'arbiter[tui]'"
                 )
             return _default_ask_interactively
         try:

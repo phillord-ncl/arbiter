@@ -1,5 +1,5 @@
-from tent_arbiter.core import Exercise, Result, RunMarker
-from tent_arbiter.matchers import Exact
+from arbiter.core import Exercise, Result, RunMarker
+from arbiter.matchers import Exact
 
 
 SIMPLE_RUBRIC_TOML = """
@@ -209,7 +209,7 @@ def test_question_context_has_output_and_files(tmp_path):
 
 
 def test_question_after_or_else_is_marked_undecided(tmp_path):
-    from tent_arbiter.matchers import Exact
+    from arbiter.matchers import Exact
 
     script = tmp_path / "s.py"
     script.write_text("print('x')\n")

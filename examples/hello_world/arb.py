@@ -1,22 +1,22 @@
 """Marking script for the "print Hello World" assignment.
 
-Run it against a submission directory (from here, so tent-arbiter
+Run it against a submission directory (from here, so arbiter
 finds this file by its default arb.py convention):
 
-    poetry run tent-arbiter submissions/correct
+    poetry run arbiter submissions/correct
 
 ...and against the broken one, to see the mechanical check fail (the
 style question is still asked -- each criterion is scored on its own):
 
-    poetry run tent-arbiter submissions/broken
+    poetry run arbiter submissions/broken
 """
 import os
 
-from tent_arbiter.core import Exercise, RunMarker
-from tent_arbiter.matchers import Exact, SubString
+from arbiter.core import Exercise, RunMarker
+from arbiter.matchers import Exact, SubString
 
 
-# tent-arbiter reads this before running the Exercise below, and
+# arbiter reads this before running the Exercise below, and
 # refuses to run it if a RunMarker's criterion/points don't match a
 # criterion actually defined here.
 RUBRIC_TOML = os.path.join(os.path.dirname(__file__), "hello_world.rubric.toml")

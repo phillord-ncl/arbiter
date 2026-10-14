@@ -232,7 +232,7 @@ class RunMarker(DirectoryMarker):
 
     def match_stdout(self, out_of, *matchers):
         """Score the script's stdout with the first of ``matchers`` (see
-        tent_arbiter.matchers) that matches it. If none do the step is
+        arbiter.matchers) that matches it. If none do the step is
         undecided: a following ``or_else()`` step takes over, otherwise it
         scores 0."""
 

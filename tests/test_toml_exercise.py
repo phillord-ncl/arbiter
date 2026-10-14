@@ -5,8 +5,8 @@ import textwrap
 import pytest
 from click.testing import CliRunner
 
-from tent_arbiter.cli import cli
-from tent_arbiter.toml_exercise import ArbTomlError, load_exercise
+from arbiter.cli import cli
+from arbiter.toml_exercise import ArbTomlError, load_exercise
 
 EXAMPLE = os.path.join(os.path.dirname(__file__), "..", "examples", "greeting")
 

@@ -1,7 +1,7 @@
 ## The same kind of Exercise as ../hello_world/arb.py, declared in TOML
 ## instead of Python. Run it with, e.g.:
 ##
-##   tent-arbiter --arb arb.toml submissions/correct
+##   arbiter --arb arb.toml submissions/correct
 
 rubric = "greeting.rubric.toml"
 

@@ -4,9 +4,9 @@ import tomllib
 import pytest
 from click.testing import CliRunner
 
-from tent_arbiter.cli import cli
-from tent_arbiter.core import Exercise, Result, RunMarker
-from tent_arbiter.dump import Dumper
+from arbiter.cli import cli
+from arbiter.core import Exercise, Result, RunMarker
+from arbiter.dump import Dumper
 
 EXAMPLE = os.path.join(os.path.dirname(__file__), "..", "examples", "greeting")
 

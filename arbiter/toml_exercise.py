@@ -41,8 +41,8 @@ the step's optional ``file`` (in the submission).
 import os
 import tomllib
 
-from tent_arbiter.core import Exercise, RunMarker
-from tent_arbiter.matchers import Always, Exact, RegexpAny, SubString
+from arbiter.core import Exercise, RunMarker
+from arbiter.matchers import Always, Exact, RegexpAny, SubString
 
 
 class ArbTomlError(Exception):

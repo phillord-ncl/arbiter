@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "tent-arbiter"
+name = "arbiter"
 version = "0.1.0"
 description = ""
 authors = ["Phillip Lord"]
@@ -13,7 +13,7 @@ textual = {version = "^8.2.8", optional = true}
 tui = ["textual"]
 
 [tool.poetry.scripts]
-tent-arbiter = "tent_arbiter.cli:cli"
+arbiter = "arbiter.cli:cli"
 
 [build-system]
 requires = ["poetry-core"]

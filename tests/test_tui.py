@@ -4,8 +4,8 @@ import pytest
 
 pytest.importorskip("textual")
 
-from tent_arbiter.core import ContextItem, Question, Session
-from tent_arbiter.tui import QuestionApp
+from arbiter.core import ContextItem, Question, Session
+from arbiter.tui import QuestionApp
 
 
 def _question(tmp_path):
@@ -66,8 +66,8 @@ def test_question_tab_shows_the_question_text(tmp_path):
 
 
 def test_header_and_marked_panel(tmp_path):
-    from tent_arbiter.core import Result
-    from tent_arbiter.tui import _header_text, _marked_text
+    from arbiter.core import Result
+    from arbiter.tui import _header_text, _marked_text
 
     question = _question(tmp_path)
     question.session.marked = [

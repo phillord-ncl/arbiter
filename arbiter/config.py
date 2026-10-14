@@ -26,7 +26,7 @@ class ConfigError(Exception):
 
 
 def default_path():
-    return os.path.join(click.get_app_dir("tent-arbiter"), "config.toml")
+    return os.path.join(click.get_app_dir("arbiter"), "config.toml")
 
 
 def _command(template):

@@ -8,7 +8,7 @@ exact one and earn partial credit.
 
 import re
 
-from tent_arbiter.core import Result
+from arbiter.core import Result
 
 
 def _as_text(match):

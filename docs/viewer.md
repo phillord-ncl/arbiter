@@ -1,9 +1,9 @@
 # Viewing a submission's files
 
-When `tent-arbiter` asks you a question in the terminal UI, the question
+When `arbiter` asks you a question in the terminal UI, the question
 comes with context: the program's output and the files in the submission.
 Out of the box the UI shows these itself, in tabs. If you would rather read
-the code in your own editor, tell `tent-arbiter` how to open it.
+the code in your own editor, tell `arbiter` how to open it.
 
 ## Configuration
 
@@ -11,9 +11,9 @@ Create `config.toml` in the per-user config directory:
 
 | Platform | Location |
 |----------|----------|
-| Linux    | `~/.config/tent-arbiter/config.toml` |
-| macOS    | `~/Library/Application Support/tent-arbiter/config.toml` |
-| Windows  | `%APPDATA%\tent-arbiter\config.toml` |
+| Linux    | `~/.config/arbiter/config.toml` |
+| macOS    | `~/Library/Application Support/arbiter/config.toml` |
+| Windows  | `%APPDATA%\arbiter\config.toml` |
 
 It has one section:
 
@@ -53,7 +53,7 @@ you finish editing.
 
 The close command kills the buffer visiting the file. If you have modified
 the buffer without saving, Emacs asks you whether to discard it, and
-`tent-arbiter` waits for your answer. If you decline, the command fails and
+`arbiter` waits for your answer. If you decline, the command fails and
 the buffer stays open.
 
 ## Example: Visual Studio Code
@@ -69,7 +69,7 @@ there is no `close` line.
 
 ## Turning the UI off
 
-`tent-arbiter --no-tui SUBMISSION` uses plain terminal prompts instead. The
+`arbiter --no-tui SUBMISSION` uses plain terminal prompts instead. The
 text context is printed before each question; the viewer is not used. The
 UI is the default when the `tui` extra is installed
-(`pip install 'tent-arbiter[tui]'`) and you are in a terminal.
+(`pip install 'arbiter[tui]'`) and you are in a terminal.
