@@ -25,21 +25,32 @@ def _noise(name):
     )
 
 
+## What marks a directory as the student's project, besides a ``.git``.
+PROJECT_FILES = ("requirements.txt", "pyproject.toml", "setup.py", "*.py")
+
+
+def _is_project(path, names):
+    return os.path.exists(os.path.join(path, ".git")) or any(
+        fnmatch.fnmatchcase(n.lower(), p) for n in names for p in PROJECT_FILES
+    )
+
+
 def submission_root(directory, depth=3):
     """The directory the student's project actually lives in: going down
-    through directories that hold nothing else, the first with a ``.git``,
-    or failing that the last one reached."""
+    through directories that hold nothing else, the first that looks like a
+    project (a ``.git``, a ``requirements.txt``, Python files...). If none
+    does, ``directory`` itself."""
     current = directory
     for _ in range(depth + 1):
-        if os.path.exists(os.path.join(current, ".git")):
-            return current
         names = [n for n in sorted(os.listdir(current)) if not _noise(n)]
+        if _is_project(current, names):
+            return current
         dirs = [n for n in names if os.path.isdir(os.path.join(current, n))]
         if len(names) == 1 and len(dirs) == 1:
             current = os.path.join(current, dirs[0])
         else:
             break
-    return current
+    return directory
 
 
 def walk(root):

@@ -24,7 +24,7 @@ the project root. Hidden directories, virtualenvs, bytecode caches and
 `marker-*` files are never searched.
 
 The project root is found for you: if an upload is wrapped in extra
-directories, `arbiter` goes down through them to the first with a `.git`.
+directories, `arbiter` goes down through them to the first that looks like a project (a `.git`, `requirements.txt`, `pyproject.toml`, `setup.py` or a `.py` file).
 Git is never looked for above that, so a submission with no `.git` does not
 borrow a parent's history.
 
