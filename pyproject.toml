@@ -6,7 +6,11 @@ authors = ["Phillip Lord"]
 
 [tool.poetry.dependencies]
 python = ">=3.14,<4.0"
-tent-pole = { git = "git@github.com:phillord-ncl/tent-pole.git", tag = "v0.7.0" }
+tent-pole = { path = "../../tent-pole/main", develop = true }
+textual = {version = "^8.2.8", optional = true}
+
+[tool.poetry.extras]
+tui = ["textual"]
 
 [tool.poetry.scripts]
 tent-arbiter = "tent_arbiter.cli:cli"
