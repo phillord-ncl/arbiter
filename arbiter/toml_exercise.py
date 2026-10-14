@@ -48,6 +48,20 @@ submission before marking.
                                          # (negative ones make a deduction,
                                          # with out_of = 0)
 
+Mechanical checks (see arbiter.checks) score full marks when they pass and
+are otherwise undecided, so ``or_else = true`` on a following step lets a
+human decide, shown what the check found::
+
+    type = "file_exists"                 # also: file_contains, files_match,
+    files = ["README.md", "README"]      #   word_count, git_commit_count,
+    out_of = 1                           #   git_log_matches,
+                                         #   note_unexpected_hidden
+    # file_contains / files_match:  files = [...], pattern = "regexp"
+    # word_count:     files = [...], low = 300, high = 500, tolerance = 0.1
+    # git_commit_count:  at_least = 4
+    # git_log_matches:   pattern = "regexp", messages = true, diffs = true
+    # note_unexpected_hidden:  allowed = [".git", ".gitignore"]  (no out_of)
+
 A question may use ``{stdout}`` and ``{stderr}`` (from the marker's own
 ``python`` step; empty if there was none) and ``{file}``, the contents of
 the step's optional ``file`` (in the submission).
@@ -100,6 +114,28 @@ def _question(spec, directory):
     return question
 
 
+def _files(spec):
+    files = spec["files"]
+    return [files] if isinstance(files, str) else list(files)
+
+
+CHECKS = {
+    "file_exists": lambda m, s: m.file_exists(s["out_of"], *_files(s)),
+    "file_contains": lambda m, s: m.file_contains(s["out_of"], _files(s), s["pattern"]),
+    "files_match": lambda m, s: m.files_match(s["out_of"], _files(s), s["pattern"]),
+    "word_count": lambda m, s: m.word_count(
+        s["out_of"], _files(s), s["low"], s["high"], s.get("tolerance", 0.0)
+    ),
+    "git_commit_count": lambda m, s: m.git_commit_count(s["out_of"], s["at_least"]),
+    "git_log_matches": lambda m, s: m.git_log_matches(
+        s["out_of"], s["pattern"], s.get("messages", True), s.get("diffs", True)
+    ),
+    "note_unexpected_hidden": lambda m, s: m.note_unexpected_hidden(
+        tuple(s.get("allowed", (".git", ".gitignore")))
+    ),
+}
+
+
 def _add_step(marker, spec, where, directory):
     kind = spec.get("type")
     if spec.get("or_else", False):
@@ -117,6 +153,8 @@ def _add_step(marker, spec, where, directory):
                 for i, m in enumerate(spec.get("match", []))
             ]
             marker.match_stdout(spec["out_of"], *matchers)
+        elif kind in CHECKS:
+            CHECKS[kind](marker, spec)
         elif kind == "ask_for_score":
             marker.ask_for_score(
                 _question(spec, directory), spec["out_of"], spec.get("choices")
@@ -124,7 +162,9 @@ def _add_step(marker, spec, where, directory):
         else:
             raise ArbTomlError(
                 "{}: unknown step type {!r} (want one of python, "
-                "match_stdout, ask_for_score)".format(where, kind)
+                "match_stdout, ask_for_score, {})".format(
+                    where, kind, ", ".join(CHECKS)
+                )
             )
     except KeyError as e:
         raise ArbTomlError("{}: missing {}".format(where, e)) from None

@@ -17,6 +17,7 @@ from .config import ConfigError, load_terminal, load_viewer
 from .core import UNDECIDED_NOTE, RestartMarking, Result
 from .dump import FILENAME, FORMATS, Dumper, load_previous
 from .scripts import ScriptClash
+from .submission import submission_root
 from .toml_exercise import ArbTomlError, load_exercise
 
 
@@ -193,7 +194,7 @@ def cli(submission, arb_path, output, also, fresh, tui):
         ask_interactively=ask_interactively,
         checkpoint=dumper.write,
         label=os.path.basename(os.path.abspath(submission)),
-        directory=os.path.abspath(submission),
+        directory=submission_root(os.path.abspath(submission)),
         previous=None if fresh else previous,
     )
     dumper.write(exercise, complete=True)

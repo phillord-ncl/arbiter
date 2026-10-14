@@ -11,6 +11,7 @@ from typing import Callable, List, Optional, Tuple, Union
 import os
 import subprocess
 
+from arbiter import checks, submission
 from arbiter import scripts as marker_scripts
 from tent_pole.rubric import load_rubric_toml
 
@@ -128,8 +129,9 @@ class Step:
     ## before it returned UNDECIDED, and is its alternative, not an
     ## addition, so max_score() counts the pair once.
     fallback: bool = False
-    ## What a step that returned UNDECIDED scores if no fallback follows.
-    undecided_result: Optional[Result] = None
+    ## What a step that returned UNDECIDED scores if no fallback follows --
+    ## a Result, or a function of the Marker's RunContext that makes one.
+    undecided_result: Optional[Union[Result, Callable[["RunContext"], Result]]] = None
 
 
 class RunContext:
@@ -145,6 +147,11 @@ class RunContext:
     not this Marker's own -- see test_two_run_markers_do_not_leak_context in
     tests/test_core.py, which is what pinned this down.
     """
+
+    def __init__(self):
+        ## What the mechanical checks found, in words, for a human question
+        ## after them to show.
+        self.notes = []
 
 
 class Marker:
@@ -239,6 +246,98 @@ class DirectoryMarker(Marker):
         super().__init__(criterion=criterion, title=title, task=task, **kwargs)
         self.directory = directory
 
+    @property
+    def root(self):
+        """Where the student's project is: ``directory``, or a directory
+        inside it (see arbiter.submission.submission_root)."""
+        return submission.submission_root(self.directory)
+
+
+    def _check(self, out_of, check):
+        """A scoring step from ``check(root) -> (ok, message)`` (see
+        arbiter.checks). Passing scores ``out_of``; otherwise the step is
+        undecided -- 0 unless an ``or_else()`` step follows -- and either
+        way ``message`` is noted for a human question to show."""
+
+        def action(ctx):
+            ok, message = check(self.root)
+            ctx.notes.append(message)
+            if ok:
+                return Result(out_of, out_of, message)
+            ctx.last_message = message
+            return UNDECIDED
+
+        return self._step(
+            True,
+            action,
+            out_of=out_of,
+            undecided_result=lambda ctx: Result(out_of, 0, ctx.last_message),
+        )
+
+    def file_exists(self, out_of, *patterns):
+        """Score ``out_of`` if the submission has a file matching any of
+        the case-insensitive globs (a pattern with no ``/`` matches a
+        file's name wherever it is)."""
+        return self._check(out_of, lambda root: checks.file_exists(root, patterns))
+
+    def file_contains(self, out_of, patterns, regexp):
+        """Score ``out_of`` if a file matching ``patterns`` (a glob or a
+        list of them) has text matching ``regexp``, ignoring case."""
+        return self._check(
+            out_of,
+            lambda root: checks.file_contains(root, _as_list(patterns), regexp),
+        )
+
+    def files_match(self, out_of, patterns, regexp):
+        """Score ``out_of`` if any line of any file matching ``patterns``
+        matches ``regexp`` (case-sensitive; use ``(?i)`` for otherwise)."""
+        return self._check(
+            out_of, lambda root: checks.files_match(root, _as_list(patterns), regexp)
+        )
+
+    def word_count(self, out_of, patterns, low, high, tolerance=0.0):
+        """Score ``out_of`` if the words in the files matching
+        ``patterns`` number from ``low`` to ``high``, widened by
+        ``tolerance`` (0.1 is 10%) at both ends."""
+        return self._check(
+            out_of,
+            lambda root: checks.word_count(
+                root, _as_list(patterns), low, high, tolerance
+            ),
+        )
+
+    def git_commit_count(self, out_of, at_least):
+        return self._check(
+            out_of, lambda root: checks.git_commit_count(root, at_least)
+        )
+
+    def git_log_matches(self, out_of, regexp, messages=True, diffs=True):
+        """Score ``out_of`` if any commit's message (``messages``) or
+        changed lines (``diffs``) match ``regexp``, ignoring case."""
+        return self._check(
+            out_of, lambda root: checks.git_log_matches(root, regexp, messages, diffs)
+        )
+
+    def note_unexpected_hidden(self, allowed=(".git", ".gitignore")):
+        """Score nothing, but note any hidden file or directory
+        (``.venv``, ``.idea``...) in the submission that is not in
+        ``allowed``, for a later question to show."""
+
+        def action(ctx):
+            found = submission.unexpected_hidden(self.root, allowed)
+            ctx.notes.append(
+                "Unexpected hidden files: " + ", ".join(found)
+                if found
+                else "No unexpected hidden files"
+            )
+            return None
+
+        return self._step(True, action)
+
+
+def _as_list(patterns):
+    return [patterns] if isinstance(patterns, str) else list(patterns)
+
 
 class RunMarker(DirectoryMarker):
     def _submission_files(self):
@@ -267,7 +366,7 @@ class RunMarker(DirectoryMarker):
         def action(ctx):
             if venv:
                 command = [
-                    marker_scripts.script_path(self.directory, "marker-python"),
+                    marker_scripts.script_path(self.root, "marker-python"),
                     entry_point,
                     *args,
                 ]
@@ -277,7 +376,7 @@ class RunMarker(DirectoryMarker):
                 command,
                 capture_output=True,
                 text=True,
-                cwd=self.directory,
+                cwd=self.root,
                 **kwargs,
             )
             return None
@@ -319,6 +418,8 @@ class RunMarker(DirectoryMarker):
         def action(ctx):
             text = question(ctx) if callable(question) else question
             context = []
+            if ctx.notes:
+                context.append(ContextItem("Automatic checks", text="\n".join(ctx.notes)))
             process = getattr(ctx, "completed_process", None)
             if process is not None:
                 context.append(ContextItem("stdout", text=process.stdout))
@@ -333,6 +434,11 @@ class RunMarker(DirectoryMarker):
             )
 
         return self._step(False, action, out_of=out_of)
+
+
+def _undecided_result(step, ctx):
+    result = step.undecided_result
+    return result(ctx) if callable(result) else result
 
 
 class Exercise:
@@ -354,7 +460,9 @@ class Exercise:
         if the submission already has something of that name."""
         if self.use_scripts:
             marker_scripts.write_scripts(
-                directory, self.all_scripts(), self.python_version
+                submission.submission_root(directory),
+                self.all_scripts(),
+                self.python_version,
             )
 
     def apply_rubric(self, path):
@@ -448,7 +556,7 @@ class Exercise:
                         continue
                     held = None
                 elif held is not None:
-                    marker.result(held.undecided_result)
+                    marker.result(_undecided_result(held, ctx))
                     held = None
                 if step.mechanical:
                     result = step.action(ctx)
@@ -460,7 +568,7 @@ class Exercise:
                     qid = "{}:{}".format(marker.criterion or "marker{}".format(number + 1), position)
                     questions.append((marker, step, ctx, qid))
             if held is not None:
-                marker.result(held.undecided_result)
+                marker.result(_undecided_result(held, ctx))
         if checkpoint is not None:
             checkpoint(self)
         for position, (marker, step, ctx, qid) in enumerate(questions, 1):
