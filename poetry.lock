@@ -566,13 +566,13 @@ files = [
 
 [[package]]
 name = "tent-pole"
-version = "0.6.0"
+version = "0.7.0"
 description = ""
 optional = false
 python-versions = ">=3.14,<4.0"
 groups = ["main"]
 files = []
-develop = true
+develop = false
 
 [package.dependencies]
 appdirs = "^1.4.4"
@@ -586,8 +586,10 @@ stringcase = "^1.2.0"
 toml = "^0.10.1"
 
 [package.source]
-type = "directory"
-url = "../../tent-pole/main"
+type = "git"
+url = "file://None/home/phillord/src/python/tent-tools/tent-pole/bare"
+reference = "v0.7.0"
+resolved_reference = "0ad6e30052d6974afd3d9541beb8abaea5f682d9"
 
 [[package]]
 name = "toml"
@@ -634,4 +636,4 @@ zstd = ["backports-zstd (>=1.0.0) ; python_version < \"3.14\""]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.14,<4.0"
-content-hash = "023f80235327beabc5c13cec00710135036fc69e73d515df848003a531572f70"
+content-hash = "bb541c9a4e26004fea77d5d2f8170eab40ce1106145b058070567a76a05b9bb5"
