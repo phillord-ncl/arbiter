@@ -1,0 +1,47 @@
+## The rubric this example's arb.toml is checked against -- a local
+## stand-in, not pushed anywhere.
+
+[assignment]
+title = "Greeting"
+description = "greeting-description.md"
+points_possible = 12
+submission_types = ["online_upload"]
+published = false
+
+[[criteria]]
+id = "correctness"
+description = "Correctness"
+long_description = """
+Running the submitted file with a name as its argument prints
+"Hello, <name>!" followed by a newline, and nothing else.
+"""
+points = 10
+
+[[criteria.ratings]]
+id = "full"
+description = "Prints exactly the greeting"
+points = 10
+
+[[criteria.ratings]]
+id = "none"
+description = "Does not greet the name given"
+points = 0
+
+[[criteria]]
+id = "style"
+description = "Style"
+long_description = """
+Readable code: sensible naming, no dead code, no unnecessary
+complexity for what the task asks.
+"""
+points = 2
+
+[[criteria.ratings]]
+id = "full"
+description = "Readable"
+points = 2
+
+[[criteria.ratings]]
+id = "none"
+description = "Not readable"
+points = 0

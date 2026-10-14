@@ -3,14 +3,17 @@ convention: look for it in the current directory unless told otherwise),
 calls its build(submission) to get an Exercise, checks it against its own
 rubric if it names one, runs it, and prints the results. Everything an
 individual arb.py used to do in its own __main__ block belongs here
-instead, so an arb.py only ever defines the Exercise itself.
+instead, so an arb.py only ever defines the Exercise itself. An arb.toml
+(see toml_exercise.py) does the same declaratively.
 """
 
 import importlib.util
+import os
 
 import click
 
 from .core import Result
+from .toml_exercise import ArbTomlError, load_exercise
 
 
 def _load_arb(path):
@@ -26,21 +29,39 @@ def _default_ask_interactively(question):
     return Result(out_of=question.out_of, score=score, feedback="marker-entered")
 
 
-@click.command(help="Run an arb.py's Exercise against one submission.")
+def _find_arb():
+    for name in ("arb.py", "arb.toml"):
+        if os.path.exists(name):
+            return name
+    raise click.UsageError("no arb.py or arb.toml in the current directory")
+
+
+@click.command(help="Run an arb.py or arb.toml's Exercise against one submission.")
 @click.argument("submission")
 @click.option(
     "--arb",
     "arb_path",
-    default="arb.py",
+    default=None,
     type=click.Path(exists=True, dir_okay=False),
-    help="Path to the arb.py defining the Exercise (default: arb.py in the "
-         "current directory).",
+    help="Path to the arb.py or arb.toml defining the Exercise (default: "
+         "arb.py, else arb.toml, in the current directory).",
 )
 def cli(submission, arb_path):
-    module = _load_arb(arb_path)
-    exercise = module.build(submission)
+    arb_path = arb_path or _find_arb()
+    if arb_path.endswith(".toml"):
+        try:
+            exercise, rubric_toml = load_exercise(arb_path, submission)
+        except ArbTomlError as e:
+            raise click.ClickException("{}: {}".format(arb_path, e))
+        ask_interactively = _default_ask_interactively
+    else:
+        module = _load_arb(arb_path)
+        exercise = module.build(submission)
+        rubric_toml = getattr(module, "RUBRIC_TOML", None)
+        ask_interactively = getattr(
+            module, "ask_interactively", _default_ask_interactively
+        )
 
-    rubric_toml = getattr(module, "RUBRIC_TOML", None)
     if rubric_toml is not None:
         problems = exercise.check_consistent_with_rubric_toml(rubric_toml)
         if problems:
@@ -50,7 +71,6 @@ def cli(submission, arb_path):
                 )
             )
 
-    ask_interactively = getattr(module, "ask_interactively", _default_ask_interactively)
     exercise.run(ask_interactively=ask_interactively)
 
     for marker in exercise.markers:

@@ -1,0 +1,62 @@
+## The same kind of Exercise as ../hello_world/arb.py, declared in TOML
+## instead of Python. Run it with, e.g.:
+##
+##   tent-arbiter --arb arb.toml submissions/correct
+
+rubric = "greeting.rubric.toml"
+
+[[marker]]
+criterion = "correctness"
+
+## Run the submission with a name, then score what it printed.
+[[marker.step]]
+type = "python"
+entry_point = "greeting.py"
+args = ["Ada"]
+
+## Matchers are tried in order; the first that matches decides.
+[[marker.step]]
+type = "match_stdout"
+out_of = 10
+
+[[marker.step.match]]
+type = "exact"
+match = "Hello, Ada!\n"
+feedback = "Your program greets Ada as required"
+score = 10
+
+[[marker.step.match]]
+type = "regexp"
+match = "(?i)hello,?\\s+ada"
+feedback = "Right idea, but the punctuation or case is off"
+score = 7
+
+[[marker.step.match]]
+type = "substring"
+match = "World"
+feedback = "Your program ignores the name it was given"
+score = 0
+
+## Nothing above matched, so ask a human -- showing them what the
+## program printed.
+[[marker.step]]
+type = "ask_for_score"
+or_else = true
+out_of = 10
+question = """
+No expected output matched. The program printed:
+{stdout}
+-- score out of 10? """
+
+## Style can't be checked mechanically: ask a human, quoting the source.
+[[marker]]
+criterion = "style"
+
+[[marker.step]]
+type = "ask_for_score"
+out_of = 2
+file = "greeting.py"
+question = """
+Style, given source:
+{file}
+-- score out of 2? """
