@@ -10,7 +10,7 @@ or can be a first pass that a person may overturn.
 
 | `type` | passes when |
 |--------|-------------|
-| `file_exists` | a file matches any of `files` |
+| `file_exists` | a file matches any of `files`, or with `require = "all"`, each of them |
 | `file_contains` | a file matching `files` has text matching `pattern` (ignoring case) |
 | `files_match` | any line of any file matching `files` matches `pattern` |
 | `word_count` | the words in the files matching `files` are from `low` to `high`, widened by `under` below `low` and `over` above `high` (0.1 is 10%) |

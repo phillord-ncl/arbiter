@@ -411,3 +411,19 @@ def test_plain_prompt_prints_shown_files_in_full(tmp_path, monkeypatch, capsys):
     _default_ask_interactively(asked[0])
     out = capsys.readouterr().out
     assert "--- a.md" in out and "the report" in out and "code" not in out
+
+
+def test_file_exists_can_require_every_pattern(tmp_path):
+    (tmp_path / "README.md").write_text("")
+
+    def score(*patterns):
+        results, _ = _score(
+            tmp_path, lambda m: m.file_exists(1, *patterns, require_all=True)
+        )
+        return results[0]
+
+    assert score("readme.md").score == 1
+    missing = score("readme.md", "licen[cs]e.md")
+    assert missing.score == 0 and "licen[cs]e.md" in missing.feedback
+    (tmp_path / "LICENCE.md").write_text("")
+    assert score("readme.md", "licen[cs]e.md").score == 1

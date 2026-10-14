@@ -15,7 +15,14 @@ import subprocess
 from arbiter import submission
 
 
-def file_exists(root, patterns):
+def file_exists(root, patterns, require_all=False):
+    """True if a file matches any of ``patterns`` (or each of them, if
+    ``require_all``)."""
+    if require_all:
+        missing = [p for p in patterns if not submission.find(root, p)]
+        if missing:
+            return False, "no file matching {}".format(" or ".join(missing))
+        return True, "found a file matching each of {}".format(", ".join(patterns))
     found = submission.find(root, *patterns)
     if found:
         return True, "found {}".format(", ".join(found))

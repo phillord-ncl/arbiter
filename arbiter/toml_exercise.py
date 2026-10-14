@@ -56,6 +56,7 @@ human decide, shown what the check found::
     files = ["README.md", "README"]      #   word_count, git_commit_count,
     out_of = 1                           #   git_log_matches,
                                          #   note_unexpected_hidden
+    # file_exists: optionally require = "all" (a file for each of files)
     # file_contains / files_match:  files = [...], pattern = "regexp"
     # word_count:     files = [...], low = 300, high = 500, over = 0.1
     #                 (under / over: fraction allowed below low / above high)
@@ -128,7 +129,9 @@ def _files(spec):
 
 
 CHECKS = {
-    "file_exists": lambda m, s: m.file_exists(s["out_of"], *_files(s)),
+    "file_exists": lambda m, s: m.file_exists(
+        s["out_of"], *_files(s), require_all=s.get("require", "any") == "all"
+    ),
     "file_contains": lambda m, s: m.file_contains(s["out_of"], _files(s), s["pattern"]),
     "files_match": lambda m, s: m.files_match(s["out_of"], _files(s), s["pattern"]),
     "word_count": lambda m, s: m.word_count(

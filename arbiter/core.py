@@ -279,11 +279,14 @@ class DirectoryMarker(Marker):
             undecided_result=lambda ctx: Result(out_of, 0, ctx.last_message),
         )
 
-    def file_exists(self, out_of, *patterns):
+    def file_exists(self, out_of, *patterns, require_all=False):
         """Score ``out_of`` if the submission has a file matching any of
-        the case-insensitive globs (a pattern with no ``/`` matches a
-        file's name wherever it is)."""
-        return self._check(out_of, lambda root: checks.file_exists(root, patterns))
+        the case-insensitive globs -- or each of them, with
+        ``require_all`` (a pattern with no ``/`` matches a file's name
+        wherever it is)."""
+        return self._check(
+            out_of, lambda root: checks.file_exists(root, patterns, require_all)
+        )
 
     def file_contains(self, out_of, patterns, regexp):
         """Score ``out_of`` if a file matching ``patterns`` (a glob or a
