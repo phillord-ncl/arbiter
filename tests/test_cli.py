@@ -1,3 +1,4 @@
+import pytest
 import textwrap
 
 from click.testing import CliRunner
@@ -92,3 +93,18 @@ def test_default_prompt_prints_context(monkeypatch, capsys):
     assert result.score == 3
     out = capsys.readouterr().out
     assert "--- stdout" in out and "hello" in out
+
+
+def test_no_tui_and_non_terminal_use_the_plain_prompt():
+    from tent_arbiter.cli import _choose_ask, _default_ask_interactively
+
+    assert _choose_ask(False) is _default_ask_interactively
+    # Under pytest stdin is not a terminal.
+    assert _choose_ask(None) is _default_ask_interactively
+
+
+def test_tui_flag_builds_the_textual_hook():
+    pytest.importorskip("textual")
+    from tent_arbiter.cli import _choose_ask, _default_ask_interactively
+
+    assert _choose_ask(True) is not _default_ask_interactively

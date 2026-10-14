@@ -9,9 +9,11 @@ instead, so an arb.py only ever defines the Exercise itself. An arb.toml
 
 import importlib.util
 import os
+import sys
 
 import click
 
+from .config import ConfigError, load_viewer
 from .core import Result
 from .dump import FILENAME, FORMATS, Dumper
 from .toml_exercise import ArbTomlError, load_exercise
@@ -32,6 +34,31 @@ def _default_ask_interactively(question):
     answer = input(question.question)
     score = float(answer) if answer.strip() else 0.0
     return Result(out_of=question.out_of, score=score, feedback="marker-entered")
+
+
+def _choose_ask(tui):
+    """The hook to answer questions with: the TUI if asked for, or if it is
+    installed and we are in a terminal; otherwise plain prompts."""
+    if tui is None:
+        tui = sys.stdin.isatty() and sys.stdout.isatty()
+        wanted = False
+    else:
+        wanted = tui
+    if tui:
+        try:
+            from .tui import make_ask_interactively
+        except ImportError:
+            if wanted:
+                raise click.ClickException(
+                    "the terminal UI needs the tui extra: pip install 'tent-arbiter[tui]'"
+                )
+            return _default_ask_interactively
+        try:
+            viewer = load_viewer()
+        except ConfigError as e:
+            raise click.ClickException(str(e))
+        return make_ask_interactively(viewer)
+    return _default_ask_interactively
 
 
 def _find_arb():
@@ -67,20 +94,27 @@ def _find_arb():
     help="Also write results in this format (repeatable). TOML is always "
          "written.",
 )
-def cli(submission, arb_path, output, also):
+@click.option(
+    "--tui/--no-tui",
+    "tui",
+    default=None,
+    help="Answer questions in the terminal UI (needs the tui extra). "
+         "Default: use it if installed and running in a terminal.",
+)
+def cli(submission, arb_path, output, also, tui):
     arb_path = arb_path or _find_arb()
     if arb_path.endswith(".toml"):
         try:
             exercise, rubric_toml = load_exercise(arb_path, submission)
         except ArbTomlError as e:
             raise click.ClickException("{}: {}".format(arb_path, e))
-        ask_interactively = _default_ask_interactively
+        ask_interactively = _choose_ask(tui)
     else:
         module = _load_arb(arb_path)
         exercise = module.build(submission)
         rubric_toml = getattr(module, "RUBRIC_TOML", None)
-        ask_interactively = getattr(
-            module, "ask_interactively", _default_ask_interactively
+        ask_interactively = getattr(module, "ask_interactively", None) or _choose_ask(
+            tui
         )
 
     if rubric_toml is not None:
