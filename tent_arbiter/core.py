@@ -26,6 +26,16 @@ class Question:
     out_of: float
 
 
+class _Undecided:
+    """What a scoring step's action returns when it could not decide."""
+
+    def __repr__(self):
+        return "UNDECIDED"
+
+
+UNDECIDED = _Undecided()
+
+
 @dataclass
 class Step:
     mechanical: bool
@@ -37,6 +47,12 @@ class Step:
     ## total is known statically, without running anything -- needed for
     ## Exercise.check_consistent_with_rubric_toml below.
     out_of: Optional[float] = None
+    ## Set by Marker.or_else(): this step runs only if the scoring step
+    ## before it returned UNDECIDED, and is its alternative, not an
+    ## addition, so max_score() counts the pair once.
+    fallback: bool = False
+    ## What a step that returned UNDECIDED scores if no fallback follows.
+    undecided_result: Optional[Result] = None
 
 
 class RunContext:
@@ -64,9 +80,29 @@ class Marker:
         self.criterion = criterion
         self.steps: List[Step] = []
         self.results: List[Result] = []
+        self._next_is_fallback = False
 
-    def _step(self, mechanical, action, out_of=None):
-        self.steps.append(Step(mechanical, action, out_of))
+    def _step(self, mechanical, action, out_of=None, undecided_result=None):
+        self.steps.append(
+            Step(
+                mechanical,
+                action,
+                out_of,
+                fallback=self._next_is_fallback,
+                undecided_result=undecided_result,
+            )
+        )
+        self._next_is_fallback = False
+        return self
+
+    def or_else(self):
+        """Make the next step a fallback: it runs only if the scoring step
+        before it could not decide (a matcher-based step that matched
+        nothing), e.g. ``.match_stdout(...).or_else().ask_for_score(...)``.
+        """
+        if not self.steps:
+            raise ValueError("or_else() needs a step before it")
+        self._next_is_fallback = True
         return self
 
     def result(self, result):
@@ -75,8 +111,21 @@ class Marker:
 
     def max_score(self):
         """Total points this Marker can award, from its own steps'
-        declared out_of values -- static, no step is actually run."""
-        return sum(step.out_of for step in self.steps if step.out_of is not None)
+        declared out_of values -- static, no step is actually run. A
+        fallback step is an alternative to the step before it, so the pair
+        counts as the larger of the two."""
+        total = 0
+        last = 0
+        for step in self.steps:
+            if step.out_of is None:
+                continue
+            if step.fallback:
+                total += max(0, step.out_of - last)
+                last = max(last, step.out_of)
+            else:
+                total += step.out_of
+                last = step.out_of
+        return total
 
 
 class DirectoryMarker(Marker):
@@ -108,16 +157,25 @@ class RunMarker(DirectoryMarker):
 
     def match_stdout(self, out_of, *matchers):
         """Score the script's stdout with the first of ``matchers`` (see
-        tent_arbiter.matchers) that matches it. If none do, scores 0."""
+        tent_arbiter.matchers) that matches it. If none do the step is
+        undecided: a following ``or_else()`` step takes over, otherwise it
+        scores 0."""
 
         def action(ctx):
             stdout = ctx.completed_process.stdout
             for matcher in matchers:
                 if matcher.matches(stdout):
                     return matcher.result(out_of)
-            return Result(out_of=out_of, score=0, feedback="stdout did not match")
+            return UNDECIDED
 
-        return self._step(True, action, out_of=out_of)
+        return self._step(
+            True,
+            action,
+            out_of=out_of,
+            undecided_result=Result(
+                out_of=out_of, score=0, feedback="stdout did not match"
+            ),
+        )
 
     def ask_for_score(self, question, out_of):
         """``question`` may be a plain string, or a callable taking the
@@ -141,13 +199,25 @@ class Exercise:
         questions = []  # [(marker, step, ctx)], deferred to the second pass
         for marker in self.markers:
             ctx = RunContext()
+            held = None  # last step to return UNDECIDED, awaiting a fallback
             for step in marker.steps:
+                if step.fallback:
+                    if held is None:
+                        continue
+                    held = None
+                elif held is not None:
+                    marker.result(held.undecided_result)
+                    held = None
                 if step.mechanical:
                     result = step.action(ctx)
-                    if result is not None:
+                    if result is UNDECIDED:
+                        held = step
+                    elif result is not None:
                         marker.result(result)
                 else:
                     questions.append((marker, step, ctx))
+            if held is not None:
+                marker.result(held.undecided_result)
         for marker, step, ctx in questions:
             question = step.action(ctx)
             marker.result(ask_interactively(question))

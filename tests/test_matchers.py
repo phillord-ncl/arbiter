@@ -1,6 +1,6 @@
 import re
 
-from tent_arbiter.core import RunMarker
+from tent_arbiter.core import Result, RunMarker
 from tent_arbiter.matchers import Always, Exact, RegexpAny, SubString
 
 
@@ -66,3 +66,78 @@ def test_fall_through_matcher(tmp_path):
 def test_no_matcher_scores_zero(tmp_path):
     result = _run(tmp_path, "nope", Exact("x", "fb", 10))
     assert result.score == 0
+
+
+def _run_with_fallback(tmp_path, stdout, answer):
+    script = tmp_path / "s.py"
+    script.write_text(f"print({stdout!r})\n")
+    marker = RunMarker(str(tmp_path))
+    marker.python(script.name).match_stdout(
+        10,
+        Exact("Hello World\n", "exact", 10),
+        Exact("Goodbye World\n", "wrong", 0),
+    ).or_else().ask_for_score("score?", 10)
+    asked = []
+
+    def ask(question):
+        asked.append(question)
+        return Result(out_of=question.out_of, score=answer, feedback="human")
+
+    from tent_arbiter.core import Exercise
+
+    Exercise(marker).run(ask_interactively=ask)
+    return marker, asked
+
+
+def test_or_else_is_skipped_when_a_matcher_decides(tmp_path):
+    marker, asked = _run_with_fallback(tmp_path, "Hello World", 7)
+    assert asked == []
+    assert [(r.score, r.feedback) for r in marker.results] == [(10, "exact")]
+
+
+def test_explicit_zero_matcher_also_decides(tmp_path):
+    marker, asked = _run_with_fallback(tmp_path, "Goodbye World", 7)
+    assert asked == []
+    assert [(r.score, r.feedback) for r in marker.results] == [(0, "wrong")]
+
+
+def test_or_else_asks_when_nothing_matches(tmp_path):
+    marker, asked = _run_with_fallback(tmp_path, "what", 7)
+    assert len(asked) == 1
+    assert [(r.score, r.feedback) for r in marker.results] == [(7, "human")]
+
+
+def test_or_else_pair_counts_once_in_max_score(tmp_path):
+    marker = RunMarker(str(tmp_path))
+    marker.python("s.py").match_stdout(10, Always("x", 0)).or_else().ask_for_score(
+        "q", 10
+    )
+    assert marker.max_score() == 10
+
+
+def test_or_else_without_a_step_is_an_error(tmp_path):
+    import pytest
+
+    with pytest.raises(ValueError):
+        RunMarker(str(tmp_path)).or_else()
+
+
+def test_or_else_question_can_quote_the_output(tmp_path):
+    script = tmp_path / "s.py"
+    script.write_text("print('surprise')\n")
+    marker = RunMarker(str(tmp_path))
+    marker.python(script.name).match_stdout(
+        10, Exact("Hello World\n", "exact", 10)
+    ).or_else().ask_for_score(
+        lambda ctx: "printed: " + ctx.completed_process.stdout, 10
+    )
+    asked = []
+
+    def ask(question):
+        asked.append(question.question)
+        return Result(out_of=question.out_of, score=0, feedback="human")
+
+    from tent_arbiter.core import Exercise
+
+    Exercise(marker).run(ask_interactively=ask)
+    assert asked == ["printed: surprise\n"]

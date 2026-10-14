@@ -39,6 +39,13 @@ def build(submission_dir):
         10,
         Exact("Hello World\n", "Your program outputs Hello World as required", 10),
         SubString("Hello", "Part of the output is right", 5),
+        Exact("Goodbye World\n", "Your program output the wrong thing", 0),
+    ).or_else().ask_for_score(
+        # Quote what the program actually printed, so the marker can see
+        # why the matchers could not decide.
+        lambda ctx: "No expected output matched. The program printed:\n{}\n"
+        "-- score out of 10? ".format(ctx.completed_process.stdout),
+        10,
     )
 
     # Style (comments, naming, structure) can't be checked
