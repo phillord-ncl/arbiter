@@ -43,7 +43,7 @@ class Viewer:
 
     def _run(self, template, path):
         args = [a.replace("{file}", path) for a in _command(template)]
-        subprocess.run(args, check=False)
+        subprocess.run(args, check=False, stdout=subprocess.DEVNULL)
 
     def open_file(self, path):
         self._run(self.open, path)
