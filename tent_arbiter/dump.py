@@ -12,7 +12,7 @@ import json
 import os
 import tempfile
 
-FILENAME = ".arb-results"
+FILENAME = "arb-results"
 
 
 def report(exercise, submission, rubric, complete):

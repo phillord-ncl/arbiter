@@ -52,7 +52,7 @@ def _find_arb():
     "output",
     default=None,
     type=click.Path(dir_okay=False),
-    help="Where to write the TOML results (default: .arb-results.toml in "
+    help="Where to write the TOML results (default: arb-results.toml in "
          "the submission directory). Extra formats go beside it.",
 )
 @click.option(

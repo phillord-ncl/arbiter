@@ -112,7 +112,7 @@ def test_cli_writes_toml_into_the_submission_by_default(tmp_path):
         cli, ["--arb", os.path.join(EXAMPLE, "arb.toml"), str(sub)], input="6\n2\n"
     )
     assert result.exit_code == 0, result.output
-    data = _load(sub / ".arb-results.toml")
+    data = _load(sub / "arb-results.toml")
     assert data["complete"] is True
     assert data["rubric"].endswith("greeting.rubric.toml")
     assert [r["decided_by"] for r in data["result"]] == ["human", "human"]
@@ -131,4 +131,4 @@ def test_cli_output_and_also_options(tmp_path):
     assert result.exit_code == 0, result.output
     assert out.exists()
     assert (out.parent / "marks.txt").exists()
-    assert not (sub / ".arb-results.toml").exists()
+    assert not (sub / "arb-results.toml").exists()
