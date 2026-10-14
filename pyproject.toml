@@ -6,11 +6,7 @@ authors = ["Phillip Lord"]
 
 [tool.poetry.dependencies]
 python = ">=3.14,<4.0"
-## Points at the feature/assessment-rubric worktree, not tent-pole's
-## main, because tent_pole.rubric (and its public load_rubric_toml)
-## only exists on that branch so far. Repoint at tent-pole's main
-## once Phil merges it -- see tent-peg/claude_state.md item 3.
-tent-pole = { path = "../../../tent-pole/feature/assessment-rubric", develop = true }
+tent-pole = { path = "../../../tent-pole/main", develop = true }
 
 [tool.poetry.scripts]
 tent-arbiter = "tent_arbiter.cli:cli"
