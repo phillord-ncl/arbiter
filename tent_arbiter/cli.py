@@ -30,10 +30,10 @@ def _default_ask_interactively(question):
 
 
 def _find_arb():
-    for name in ("arb.py", "arb.toml"):
+    for name in ("arb.toml", "arb.py"):
         if os.path.exists(name):
             return name
-    raise click.UsageError("no arb.py or arb.toml in the current directory")
+    raise click.UsageError("no arb.toml or arb.py in the current directory")
 
 
 @click.command(help="Run an arb.py or arb.toml's Exercise against one submission.")
@@ -44,7 +44,7 @@ def _find_arb():
     default=None,
     type=click.Path(exists=True, dir_okay=False),
     help="Path to the arb.py or arb.toml defining the Exercise (default: "
-         "arb.py, else arb.toml, in the current directory).",
+         "arb.toml, else arb.py, in the current directory).",
 )
 def cli(submission, arb_path):
     arb_path = arb_path or _find_arb()

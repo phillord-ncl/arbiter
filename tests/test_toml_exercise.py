@@ -113,3 +113,18 @@ def test_default_arb_lookup_falls_back_to_arb_toml(tmp_path, monkeypatch):
     result = CliRunner().invoke(cli, [str(tmp_path)])
     assert result.exit_code == 0, result.output
     assert "c: 3/3 -- ok" in result.output
+
+
+def test_default_arb_lookup_prefers_arb_toml_over_arb_py(tmp_path, monkeypatch):
+    (tmp_path / "arb.py").write_text("raise RuntimeError('arb.py was loaded')\n")
+    (tmp_path / "s.py").write_text("print('x')\n")
+    _write(
+        tmp_path,
+        """
+        [[marker]]
+        criterion = "c"
+        """,
+    )
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(cli, [str(tmp_path)])
+    assert result.exit_code == 0, result.output
