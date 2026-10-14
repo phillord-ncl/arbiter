@@ -21,6 +21,15 @@ class Result:
     score: float
     feedback: str
     decided_by: str = "mechanical"
+    ## Set on a human answer: which question it answers, so a later run can
+    ## find it again (see Exercise.run). None for a mechanical result.
+    question_id: Optional[str] = None
+
+
+class RestartMarking(Exception):
+    """Raised by an ask hook to throw away this attempt's results and mark
+    the submission again from the start (after the marker has edited it,
+    say). Answers already given come back as the stored ones."""
 
 
 UNDECIDED_NOTE = "(The automatic checks could not decide this one.)"
@@ -77,6 +86,10 @@ class Question:
     ## any number from 0 to ``out_of``. A deduction is just a scale that
     ## goes below zero, e.g. choices of (0, -1) with an out_of of 0.
     choices: Optional[List[float]] = None
+    ## What the marker answered to this question on an earlier attempt or
+    ## run, if anything, for a UI to show and pre-fill. Only set if it is
+    ## still an acceptable answer.
+    previous: Optional[Result] = None
 
     def accepts(self, score):
         if self.choices is not None:
@@ -391,17 +404,45 @@ class Exercise:
             for name in names
         ]
 
-    def run(self, ask_interactively, checkpoint=None, label="", directory=None):
+    def run(
+        self,
+        ask_interactively,
+        checkpoint=None,
+        label="",
+        directory=None,
+        previous=None,
+    ):
         """``checkpoint``, if given, is called with this Exercise after the
         mechanical pass and after every human answer, so results can be
         saved as they happen rather than only at the end. ``label`` names
         the submission, and ``directory`` is where it is, in each question's
-        ``session``."""
-        questions = []  # [(marker, step, ctx)], deferred to the second pass
-        for marker in self.markers:
+        ``session``.
+
+        ``previous`` maps a question id to the human answer stored by an
+        earlier run. Every mechanical step is run afresh each time -- they
+        are cheap and the files may have changed -- but a question shows
+        its stored answer, pre-filled. Answers not yet asked again stay in
+        ``self.stored`` so checkpoints do not lose them. An ask hook that
+        raises ``RestartMarking`` starts the whole attempt again."""
+        self.stored = dict(previous or {})
+        self.restarts = 0
+        while True:
+            self.given = {}
+            for marker in self.markers:
+                marker.results = []
+            try:
+                self._attempt(ask_interactively, checkpoint, label, directory)
+                return self
+            except RestartMarking:
+                self.restarts += 1
+                self.stored.update(self.given)
+
+    def _attempt(self, ask_interactively, checkpoint, label, directory):
+        questions = []  # [(marker, step, ctx, id)], deferred to the second pass
+        for number, marker in enumerate(self.markers):
             ctx = RunContext()
             held = None  # last step to return UNDECIDED, awaiting a fallback
-            for step in marker.steps:
+            for position, step in enumerate(marker.steps):
                 if step.fallback:
                     if held is None:
                         continue
@@ -416,13 +457,17 @@ class Exercise:
                     elif result is not None:
                         marker.result(result)
                 else:
-                    questions.append((marker, step, ctx))
+                    qid = "{}:{}".format(marker.criterion or "marker{}".format(number + 1), position)
+                    questions.append((marker, step, ctx, qid))
             if held is not None:
                 marker.result(held.undecided_result)
         if checkpoint is not None:
             checkpoint(self)
-        for position, (marker, step, ctx) in enumerate(questions, 1):
+        for position, (marker, step, ctx, qid) in enumerate(questions, 1):
             question = step.action(ctx)
+            stored = self.stored.get(qid)
+            if stored is not None and question.accepts(stored.score):
+                question.previous = stored
             question.session = Session(
                 label,
                 marker.name,
@@ -438,10 +483,12 @@ class Exercise:
             )
             answer = ask_interactively(question)
             answer.decided_by = "human"
+            answer.question_id = qid
             marker.result(answer)
+            self.given[qid] = answer
+            self.stored.pop(qid, None)
             if checkpoint is not None:
                 checkpoint(self)
-        return self
 
     def check_consistent_with_rubric_toml(self, path):
         """Cross-check this Exercise's own Markers against a tent-pole

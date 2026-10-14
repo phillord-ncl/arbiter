@@ -10,7 +10,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Footer, Input, Label, Static, TabbedContent, TabPane
 
-from .core import UNDECIDED_NOTE, Result
+from .core import UNDECIDED_NOTE, RestartMarking, Result
 from .terminal import TerminalError, open_terminal
 
 
@@ -84,6 +84,7 @@ class QuestionApp(App):
         Binding("ctrl+o", "open_file", "Open in viewer"),
         Binding("ctrl+x", "close_file", "Close in viewer"),
         Binding("ctrl+t", "terminal", "Terminal"),
+        Binding("ctrl+r", "restart", "Restart marking"),
     ]
 
     def __init__(self, question, viewer=None, terminal=None):
@@ -94,6 +95,7 @@ class QuestionApp(App):
         ## platform default.
         self.terminal = terminal
         self.result = None
+        self.restart = False
 
     def compose(self) -> ComposeResult:
         yield Label(_header_text(self.question), id="header", markup=False)
@@ -113,10 +115,17 @@ class QuestionApp(App):
                             yield Static(_item_text(item), markup=False)
             with VerticalScroll(id="marked"):
                 yield Static(_marked_text(self.question), markup=False)
+        previous = self.question.previous
         yield Input(
-            placeholder="score ({})".format(self.question.allowed()), id="score"
+            value=format(previous.score, "g") if previous else "",
+            placeholder="score ({})".format(self.question.allowed()),
+            id="score",
         )
-        yield Input(placeholder="feedback", id="feedback")
+        yield Input(
+            value=previous.feedback if previous else "",
+            placeholder="feedback",
+            id="feedback",
+        )
         yield Footer()
 
     def on_mount(self):
@@ -143,6 +152,10 @@ class QuestionApp(App):
         item = self._current_item()
         if self.viewer is not None and item is not None and item.path is not None:
             self.viewer.close_file(item.path)
+
+    def action_restart(self):
+        self.restart = True
+        self.exit()
 
     def action_terminal(self):
         session = self.question.session
@@ -184,6 +197,8 @@ def make_ask_interactively(viewer=None, terminal=None):
     def ask(question):
         app = QuestionApp(question, viewer, terminal)
         app.run()
+        if app.restart:
+            raise RestartMarking()
         if app.result is None:
             raise KeyboardInterrupt("question not answered")
         return app.result

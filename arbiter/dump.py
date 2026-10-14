@@ -24,6 +24,7 @@ def report(exercise, submission, rubric, complete):
             "out_of": r.out_of,
             "feedback": r.feedback,
             "decided_by": r.decided_by,
+            "question": r.question_id or "",
             "part": marker.part or "",
             "formative": marker.formative,
         }
@@ -36,9 +37,24 @@ def report(exercise, submission, rubric, complete):
         "complete": complete,
         "score": exercise.score(),
         "out_of": exercise.max_score(),
+        "restarts": getattr(exercise, "restarts", 0),
         "parts": [
             {"part": name, "score": score, "out_of": out_of}
             for name, score, out_of in exercise.parts()
+        ],
+        ## Answers stored by an earlier run and not asked again yet, so a
+        ## checkpoint does not lose them. Not counted in the score; dropped
+        ## once marking is complete.
+        "stored": []
+        if complete
+        else [
+            {
+                "question": qid,
+                "score": r.score,
+                "out_of": r.out_of,
+                "feedback": r.feedback,
+            }
+            for qid, r in getattr(exercise, "stored", {}).items()
         ],
         "results": results,
     }
@@ -56,16 +72,13 @@ def render_toml(data):
     lines = [
         "{} = {}".format(k, _value(v))
         for k, v in data.items()
-        if k not in ("results", "parts")
+        if k not in ("results", "parts", "stored")
     ]
-    for part in data["parts"]:
-        lines.append("")
-        lines.append("[[part]]")
-        lines.extend("{} = {}".format(k, _value(v)) for k, v in part.items())
-    for r in data["results"]:
-        lines.append("")
-        lines.append("[[result]]")
-        lines.extend("{} = {}".format(k, _value(v)) for k, v in r.items())
+    for table, key in (("part", "parts"), ("stored", "stored"), ("result", "results")):
+        for row in data[key]:
+            lines.append("")
+            lines.append("[[{}]]".format(table))
+            lines.extend("{} = {}".format(k, _value(v)) for k, v in row.items())
     return "\n".join(lines) + "\n"
 
 
@@ -105,6 +118,29 @@ def _atomic_write(path, text):
     except BaseException:
         os.unlink(tmp)
         raise
+
+
+def load_previous(path):
+    """The human answers stored in an earlier results file, as
+    ``{question id: Result}``; empty if there is no such file."""
+    import tomllib
+
+    from arbiter.core import Result
+
+    try:
+        with open(path, "rb") as f:
+            data = tomllib.load(f)
+    except FileNotFoundError:
+        return {}
+    rows = [r for r in data.get("result", []) if r.get("decided_by") == "human"]
+    rows += data.get("stored", [])
+    return {
+        r["question"]: Result(
+            r["out_of"], r["score"], r["feedback"], "human", r["question"]
+        )
+        for r in rows
+        if r.get("question")
+    }
 
 
 class Dumper:

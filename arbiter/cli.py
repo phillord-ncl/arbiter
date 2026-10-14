@@ -14,8 +14,8 @@ import sys
 import click
 
 from .config import ConfigError, load_terminal, load_viewer
-from .core import UNDECIDED_NOTE, Result
-from .dump import FILENAME, FORMATS, Dumper
+from .core import UNDECIDED_NOTE, RestartMarking, Result
+from .dump import FILENAME, FORMATS, Dumper, load_previous
 from .scripts import ScriptClash
 from .toml_exercise import ArbTomlError, load_exercise
 
@@ -43,8 +43,22 @@ def _default_ask_interactively(question):
         click.echo("--- {}".format(item.title))
         if item.text is not None:
             click.echo(item.text)
+    previous = question.previous
+    if previous is not None:
+        click.echo(
+            "Stored answer: {} -- {} (Enter keeps it)".format(
+                previous.score, previous.feedback
+            )
+        )
+    click.echo("(type 'restart' to mark this submission again from the start)")
     while True:
         answer = input(question.question)
+        if answer.strip().lower() == "restart":
+            raise RestartMarking()
+        if previous is not None and not answer.strip():
+            return Result(
+                out_of=question.out_of, score=previous.score, feedback=previous.feedback
+            )
         try:
             score = float(answer) if answer.strip() else 0.0
         except ValueError:
@@ -118,13 +132,19 @@ def _find_arb():
          "written.",
 )
 @click.option(
+    "--fresh",
+    is_flag=True,
+    help="Ignore answers stored in an earlier results file for this "
+         "submission (by default they are shown, pre-filled).",
+)
+@click.option(
     "--tui/--no-tui",
     "tui",
     default=None,
     help="Answer questions in the terminal UI (needs the tui extra). "
          "Default: use it if installed and running in a terminal.",
 )
-def cli(submission, arb_path, output, also, tui):
+def cli(submission, arb_path, output, also, fresh, tui):
     arb_path = arb_path or _find_arb()
     if arb_path.endswith(".toml"):
         try:
@@ -157,6 +177,13 @@ def cli(submission, arb_path, output, also, tui):
         base = output[: -len(".toml")] if output.endswith(".toml") else output
     dumper = Dumper(base, submission, rubric_toml, also)
     try:
+        previous = load_previous(base + ".toml")
+    except (OSError, ValueError, KeyError) as e:
+        raise click.ClickException(
+            "cannot read the earlier results {}.toml ({}); remove it or use "
+            "--fresh".format(base, e)
+        )
+    try:
         exercise.prepare(submission)
     except ScriptClash as e:
         raise click.ClickException(str(e))
@@ -167,6 +194,7 @@ def cli(submission, arb_path, output, also, tui):
         checkpoint=dumper.write,
         label=os.path.basename(os.path.abspath(submission)),
         directory=os.path.abspath(submission),
+        previous=None if fresh else previous,
     )
     dumper.write(exercise, complete=True)
 
