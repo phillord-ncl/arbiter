@@ -13,6 +13,7 @@ import os
 import click
 
 from .core import Result
+from .dump import FILENAME, FORMATS, Dumper
 from .toml_exercise import ArbTomlError, load_exercise
 
 
@@ -46,7 +47,23 @@ def _find_arb():
     help="Path to the arb.py or arb.toml defining the Exercise (default: "
          "arb.toml, else arb.py, in the current directory).",
 )
-def cli(submission, arb_path):
+@click.option(
+    "--output",
+    "output",
+    default=None,
+    type=click.Path(dir_okay=False),
+    help="Where to write the TOML results (default: .arb-results.toml in "
+         "the submission directory). Extra formats go beside it.",
+)
+@click.option(
+    "--also",
+    "also",
+    multiple=True,
+    type=click.Choice([f for f in FORMATS if f != "toml"]),
+    help="Also write results in this format (repeatable). TOML is always "
+         "written.",
+)
+def cli(submission, arb_path, output, also):
     arb_path = arb_path or _find_arb()
     if arb_path.endswith(".toml"):
         try:
@@ -71,7 +88,14 @@ def cli(submission, arb_path):
                 )
             )
 
-    exercise.run(ask_interactively=ask_interactively)
+    base = os.path.join(submission, FILENAME)
+    if output is not None:
+        base = output[: -len(".toml")] if output.endswith(".toml") else output
+    dumper = Dumper(base, submission, rubric_toml, also)
+    # Write after every human answer, not just at the end, so a crash
+    # mid-marking keeps what was already entered.
+    exercise.run(ask_interactively=ask_interactively, checkpoint=dumper.write)
+    dumper.write(exercise, complete=True)
 
     for marker in exercise.markers:
         for result in marker.results:
@@ -80,3 +104,5 @@ def cli(submission, arb_path):
                     marker.criterion, result.score, result.out_of, result.feedback
                 )
             )
+    for path in dumper.paths():
+        click.echo("results written to {}".format(path), err=True)

@@ -11,12 +11,14 @@ from tent_arbiter.toml_exercise import ArbTomlError, load_exercise
 EXAMPLE = os.path.join(os.path.dirname(__file__), "..", "examples", "greeting")
 
 
-def _run_example(submission, answers=""):
+def _run_example(tmp_path, submission, answers=""):
     result = CliRunner().invoke(
         cli,
         [
             "--arb",
             os.path.join(EXAMPLE, "arb.toml"),
+            "--output",
+            str(tmp_path / "results.toml"),
             os.path.join(EXAMPLE, "submissions", submission),
         ],
         input=answers,
@@ -25,31 +27,31 @@ def _run_example(submission, answers=""):
     return result.output
 
 
-def test_example_correct_submission_is_decided_mechanically():
-    output = _run_example("correct", "2\n")
+def test_example_correct_submission_is_decided_mechanically(tmp_path):
+    output = _run_example(tmp_path, "correct", "2\n")
     assert "correctness: 10/10 -- Your program greets Ada as required" in output
     assert "No expected output matched" not in output
 
 
-def test_example_partial_credit():
-    output = _run_example("sloppy", "1\n")
+def test_example_partial_credit(tmp_path):
+    output = _run_example(tmp_path, "sloppy", "1\n")
     assert "correctness: 7/10 -- Right idea" in output
 
 
-def test_example_explicit_zero_does_not_ask():
-    output = _run_example("ignores_name", "0\n")
+def test_example_explicit_zero_does_not_ask(tmp_path):
+    output = _run_example(tmp_path, "ignores_name", "0\n")
     assert "correctness: 0/10 -- Your program ignores the name" in output
     assert "No expected output matched" not in output
 
 
-def test_example_undecided_asks_and_quotes_stdout():
-    output = _run_example("odd", "6\n2\n")
+def test_example_undecided_asks_and_quotes_stdout(tmp_path):
+    output = _run_example(tmp_path, "odd", "6\n2\n")
     assert "The program printed:\nGreetings, Ada" in output
     assert "correctness: 6.0/10 -- marker-entered" in output
 
 
-def test_example_style_question_quotes_the_source():
-    assert 'print("Hello, World!")' in _run_example("ignores_name", "0\n")
+def test_example_style_question_quotes_the_source(tmp_path):
+    assert 'print("Hello, World!")' in _run_example(tmp_path, "ignores_name", "0\n")
 
 
 def _write(tmp_path, text):

@@ -18,6 +18,7 @@ class Result:
     out_of: float
     score: float
     feedback: str
+    decided_by: str = "mechanical"
 
 
 @dataclass
@@ -195,7 +196,10 @@ class Exercise:
     def __init__(self, *markers):
         self.markers = list(markers)
 
-    def run(self, ask_interactively):
+    def run(self, ask_interactively, checkpoint=None):
+        """``checkpoint``, if given, is called with this Exercise after the
+        mechanical pass and after every human answer, so results can be
+        saved as they happen rather than only at the end."""
         questions = []  # [(marker, step, ctx)], deferred to the second pass
         for marker in self.markers:
             ctx = RunContext()
@@ -218,9 +222,15 @@ class Exercise:
                     questions.append((marker, step, ctx))
             if held is not None:
                 marker.result(held.undecided_result)
+        if checkpoint is not None:
+            checkpoint(self)
         for marker, step, ctx in questions:
             question = step.action(ctx)
-            marker.result(ask_interactively(question))
+            answer = ask_interactively(question)
+            answer.decided_by = "human"
+            marker.result(answer)
+            if checkpoint is not None:
+                checkpoint(self)
         return self
 
     def check_consistent_with_rubric_toml(self, path):
