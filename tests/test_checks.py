@@ -68,6 +68,12 @@ def test_root_ignores_macos_noise_and_our_files(tmp_path):
     assert submission.submission_root(str(tmp_path)) == str(tmp_path / "project")
 
 
+def test_root_without_a_git_directory_is_still_the_inner_project(tmp_path):
+    (tmp_path / "project").mkdir()
+    (tmp_path / "project" / "a.py").write_text("")
+    assert submission.submission_root(str(tmp_path)) == str(tmp_path / "project")
+
+
 def test_root_is_the_directory_when_it_is_not_just_a_wrapper(tmp_path):
     (tmp_path / "sub").mkdir()
     (tmp_path / "a.py").write_text("")

@@ -26,9 +26,9 @@ def _noise(name):
 
 
 def submission_root(directory, depth=3):
-    """The directory the student's project actually lives in: the first
-    with a ``.git``, found by going down through directories that hold
-    nothing else. If there is none, ``directory`` itself."""
+    """The directory the student's project actually lives in: going down
+    through directories that hold nothing else, the first with a ``.git``,
+    or failing that the last one reached."""
     current = directory
     for _ in range(depth + 1):
         if os.path.exists(os.path.join(current, ".git")):
@@ -39,7 +39,7 @@ def submission_root(directory, depth=3):
             current = os.path.join(current, dirs[0])
         else:
             break
-    return directory
+    return current
 
 
 def walk(root):
