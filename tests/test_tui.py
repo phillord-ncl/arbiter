@@ -63,3 +63,20 @@ def test_question_tab_shows_the_question_text(tmp_path):
             assert any(t.startswith("style: out of 5") for t in texts)
 
     asyncio.run(go())
+
+
+def test_header_and_marked_panel(tmp_path):
+    from tent_arbiter.core import Result
+    from tent_arbiter.tui import _header_text, _marked_text
+
+    question = _question(tmp_path)
+    question.session.marked = [
+        ("output", Result(out_of=10, score=7, feedback="close")),
+        ("style", Result(out_of=2, score=1, feedback="ok", decided_by="human")),
+    ]
+    header = _header_text(question)
+    assert "Student/Directory: alice" in header
+    assert "Criterion: style" in header
+    marked = _marked_text(question)
+    assert "[AUTO] output: 7/10" in marked
+    assert "[you] style: 1/2" in marked

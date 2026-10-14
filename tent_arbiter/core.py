@@ -7,7 +7,7 @@ the whole tree: every mechanical step first, in document order within each
 """
 
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional, Union
+from typing import Callable, List, Optional, Tuple, Union
 import os
 import subprocess
 
@@ -48,6 +48,9 @@ class Session:
     out_of: float
     position: int
     total: int
+    ## (criterion, Result) for everything marked so far, automatic or
+    ## human, in the order it was decided.
+    marked: List[Tuple[Optional[str], Result]] = field(default_factory=list)
 
 
 @dataclass
@@ -108,7 +111,10 @@ class RunContext:
 
 
 class Marker:
-    def __init__(self, criterion=None):
+    def __init__(self, criterion=None, title=None):
+        ## A human-readable name for what this Marker marks, shown to
+        ## whoever is marking; ``criterion`` stays the stable id.
+        self.title = title
         ## Which tent-pole .rubric.toml criterion (by its own "id", not
         ## a Canvas id -- those aren't stable, see tent-pole's
         ## rubric.py) this Marker's results count towards. None means
@@ -118,6 +124,10 @@ class Marker:
         self.steps: List[Step] = []
         self.results: List[Result] = []
         self._next_is_fallback = False
+
+    @property
+    def name(self):
+        return self.title or self.criterion
 
     def _step(self, mechanical, action, out_of=None, undecided_result=None):
         self.steps.append(
@@ -173,8 +183,8 @@ class DirectoryMarker(Marker):
     file within it to act on, rather than a Marker being tied to one
     fixed file."""
 
-    def __init__(self, directory, criterion=None):
-        super().__init__(criterion=criterion)
+    def __init__(self, directory, criterion=None, title=None):
+        super().__init__(criterion=criterion, title=title)
         self.directory = directory
 
 
@@ -294,11 +304,12 @@ class Exercise:
             question = step.action(ctx)
             question.session = Session(
                 label,
-                marker.criterion,
+                marker.name,
                 self.score(),
                 self.max_score(),
                 position,
                 len(questions),
+                [(m.name, r) for m in self.markers for r in m.results],
             )
             answer = ask_interactively(question)
             answer.decided_by = "human"

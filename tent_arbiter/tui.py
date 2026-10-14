@@ -7,7 +7,7 @@ question gets its own short-lived app rather than one app driving the run.
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import VerticalScroll
+from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Footer, Input, Label, Static, TabbedContent, TabPane
 
 from .core import UNDECIDED_NOTE, Result
@@ -16,15 +16,31 @@ from .core import UNDECIDED_NOTE, Result
 def _header_text(question):
     session = question.session
     if session is None:
-        return "Out of {}".format(question.out_of)
-    return "{}   {}   marks {}/{}   question {} of {}".format(
-        session.label or "(submission)",
-        session.criterion or "",
-        session.score,
-        session.out_of,
-        session.position,
-        session.total,
+        return "Marks available: {}".format(question.out_of)
+    return "\n".join(
+        [
+            "Student/Directory: {}".format(session.label or "(unknown)"),
+            "Criterion: {}".format(session.criterion or "(none)"),
+            "Marks so far: {} of {}   Question {} of {}".format(
+                session.score, session.out_of, session.position, session.total
+            ),
+        ]
     )
+
+
+def _marked_text(question):
+    session = question.session
+    if session is None or not session.marked:
+        return "Nothing marked yet."
+    lines = []
+    for criterion, result in session.marked:
+        who = "you" if result.decided_by == "human" else "AUTO"
+        lines.append(
+            "[{}] {}: {}/{}\n    {}".format(
+                who, criterion or "(none)", result.score, result.out_of, result.feedback
+            )
+        )
+    return "\n".join(lines)
 
 
 def _question_text(question):
@@ -52,7 +68,9 @@ def _item_text(item):
 class QuestionApp(App):
     CSS = """
     #header { background: $boost; padding: 0 1; }
-    TabbedContent { height: 1fr; }
+    #body { height: 1fr; }
+    #context { width: 2fr; }
+    #marked { width: 1fr; border: round $primary; border-title-align: left; padding: 0 1; }
     #entry { height: auto; }
     """
     BINDINGS = [
@@ -67,15 +85,18 @@ class QuestionApp(App):
         self.result = None
 
     def compose(self) -> ComposeResult:
-        yield Label(_header_text(self.question), id="header")
-        with TabbedContent(id="context"):
-            with TabPane("Question", id="question"):
-                with VerticalScroll():
-                    yield Static(_question_text(self.question), markup=False)
-            for i, item in enumerate(self.question.context):
-                with TabPane(item.title, id="item{}".format(i)):
+        yield Label(_header_text(self.question), id="header", markup=False)
+        with Horizontal(id="body"):
+            with TabbedContent(id="context"):
+                with TabPane("Question", id="question"):
                     with VerticalScroll():
-                        yield Static(_item_text(item), markup=False)
+                        yield Static(_question_text(self.question), markup=False)
+                for i, item in enumerate(self.question.context):
+                    with TabPane(item.title, id="item{}".format(i)):
+                        with VerticalScroll():
+                            yield Static(_item_text(item), markup=False)
+            with VerticalScroll(id="marked"):
+                yield Static(_marked_text(self.question), markup=False)
         yield Input(
             placeholder="score (0 to {})".format(self.question.out_of), id="score"
         )
@@ -83,6 +104,7 @@ class QuestionApp(App):
         yield Footer()
 
     def on_mount(self):
+        self.query_one("#marked").border_title = "Marked so far"
         self.query_one("#score").focus()
 
     def _current_item(self):

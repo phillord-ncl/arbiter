@@ -7,6 +7,7 @@ rubric = "greeting.rubric.toml"
 
 [[marker]]
 criterion = "correctness"
+title = "Hello World Program Output"
 
 ## Run the submission with a name, then score what it printed.
 [[marker.step]]
@@ -51,6 +52,7 @@ The program ran, but the output was not expected. It printed:
 ## Style can't be checked mechanically: ask a human, quoting the source.
 [[marker]]
 criterion = "style"
+title = "Hello World: code style"
 
 [[marker.step]]
 type = "ask_for_score"

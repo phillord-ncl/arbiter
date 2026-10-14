@@ -246,3 +246,19 @@ def test_question_session_tracks_progress(tmp_path):
         ("alice", "c", 3, 12, 1, 2),
         ("alice", "c", 4, 12, 2, 2),
     ]
+
+
+def test_marker_title_is_what_the_session_shows(tmp_path):
+    script = tmp_path / "s.py"
+    script.write_text("print('x')\n")
+    marker = RunMarker(str(tmp_path), criterion="c", title="The nice name")
+    marker.python(script.name).ask_for_score("q", 5)
+    sessions = []
+
+    def ask(question):
+        sessions.append(question.session)
+        return Result(out_of=question.out_of, score=1, feedback="")
+
+    Exercise(marker).run(ask_interactively=ask)
+    assert sessions[0].criterion == "The nice name"
+    assert marker.criterion == "c"

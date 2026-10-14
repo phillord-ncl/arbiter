@@ -8,6 +8,7 @@ still needs an ``arb.py``. Layout::
 
     [[marker]]
     criterion = "correctness"            # a .rubric.toml criterion id
+    title = "Hello World output"         # optional: what the marker is shown
 
     [[marker.step]]
     type = "python"                      # entry point, in the submission
@@ -113,7 +114,9 @@ def load_exercise(path, submission_dir):
     markers = []
     for i, spec in enumerate(data.get("marker", [])):
         where = "marker {}".format(i + 1)
-        marker = RunMarker(submission_dir, criterion=spec.get("criterion"))
+        marker = RunMarker(
+            submission_dir, criterion=spec.get("criterion"), title=spec.get("title")
+        )
         for j, step in enumerate(spec.get("step", [])):
             _add_step(marker, step, "{} step {}".format(where, j + 1), submission_dir)
         markers.append(marker)
