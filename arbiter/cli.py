@@ -44,6 +44,9 @@ def _default_ask_interactively(question):
         click.echo("--- {}".format(item.title))
         if item.text is not None:
             click.echo(item.text)
+        elif item.inline and item.path is not None:
+            with open(item.path, errors="replace") as f:
+                click.echo(f.read())
     previous = question.previous
     if previous is not None:
         click.echo(

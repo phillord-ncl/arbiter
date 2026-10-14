@@ -63,6 +63,13 @@ human decide, shown what the check found::
     # git_log_matches:   pattern = "regexp", messages = true, diffs = true
     # note_unexpected_hidden:  allowed = [".git", ".gitignore"]  (no out_of)
 
+Steps that score nothing but choose what a later question shows (when any
+are used, the question shows these instead of listing every file)::
+
+    type = "show_git_log"                # optional: title, args = ["--stat"]
+    type = "show_files"                  # files = ["doc/*.md", "*.py"]
+    type = "show_command"                # title = "...", command = ["git", "status"]
+
 A question may use ``{stdout}`` and ``{stderr}`` (from the marker's own
 ``python`` step; empty if there was none) and ``{file}``, the contents of
 the step's optional ``file`` (in the submission).
@@ -134,6 +141,9 @@ CHECKS = {
     "note_unexpected_hidden": lambda m, s: m.note_unexpected_hidden(
         tuple(s.get("allowed", (".git", ".gitignore")))
     ),
+    "show_git_log": lambda m, s: m.show_git_log(s.get("title", "Git log"), *s.get("args", [])),
+    "show_files": lambda m, s: m.show_files(*_files(s)),
+    "show_command": lambda m, s: m.show_command(s["title"], list(s["command"])),
 }
 
 

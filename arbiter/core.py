@@ -44,6 +44,9 @@ class ContextItem:
     title: str
     text: Optional[str] = None
     path: Optional[str] = None
+    ## A file the plain prompt should print in full (one a step chose to
+    ## show), not just offer to a viewer.
+    inline: bool = False
 
 
 @dataclass
@@ -152,6 +155,8 @@ class RunContext:
         ## What the mechanical checks found, in words, for a human question
         ## after them to show.
         self.notes = []
+        ## What the show_* steps chose to put in front of a human question.
+        self.shown = []
 
 
 class Marker:
@@ -334,6 +339,68 @@ class DirectoryMarker(Marker):
 
         return self._step(True, action)
 
+    def show_command(self, title, command):
+        """Run ``command`` (a list of words, in the project root) and show
+        its output to a later human question under ``title``."""
+
+        def action(ctx):
+            ctx.shown.append(ContextItem(title, text=_run_for_display(command, self.root)))
+            return None
+
+        return self._step(True, action)
+
+    def show_git_log(self, title="Git log", *args):
+        """Show the project's ``git log`` (``args`` default to a dated
+        ``--stat`` listing)."""
+        args = args or ("--stat", "--date=short")
+
+        def action(ctx):
+            if not checks.has_git(self.root):
+                text = "(no .git directory)"
+            else:
+                result = checks._git(self.root, "log", *args)
+                text = result[1] if result and result[0] == 0 else "(could not read the git history)"
+            ctx.shown.append(ContextItem(title, text=text))
+            return None
+
+        return self._step(True, action)
+
+    def show_files(self, *patterns):
+        """Show each file matching any of ``patterns`` (see
+        ``file_exists``), one tab each, which a viewer can open."""
+
+        def action(ctx):
+            found = submission.find(self.root, *patterns)
+            if not found:
+                ctx.shown.append(
+                    ContextItem(
+                        "Files",
+                        text="(no file matching {})".format(" or ".join(patterns)),
+                    )
+                )
+            for rel in found:
+                ctx.shown.append(
+                    ContextItem(rel, path=os.path.join(self.root, rel), inline=True)
+                )
+            return None
+
+        return self._step(True, action)
+
+
+def _run_for_display(command, directory):
+    try:
+        run = subprocess.run(
+            command,
+            cwd=directory,
+            capture_output=True,
+            text=True,
+            errors="replace",
+            timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return "(could not run {}: {})".format(" ".join(command), e)
+    return run.stdout + (("\n" + run.stderr) if run.stderr else "")
+
 
 def _as_list(patterns):
     return [patterns] if isinstance(patterns, str) else list(patterns)
@@ -420,11 +487,13 @@ class RunMarker(DirectoryMarker):
             context = []
             if ctx.notes:
                 context.append(ContextItem("Automatic checks", text="\n".join(ctx.notes)))
+            context.extend(ctx.shown)
             process = getattr(ctx, "completed_process", None)
             if process is not None:
                 context.append(ContextItem("stdout", text=process.stdout))
                 context.append(ContextItem("stderr", text=process.stderr))
-            context.extend(self._submission_files())
+            if not ctx.shown:
+                context.extend(self._submission_files())
             return Question(
                 text,
                 out_of,

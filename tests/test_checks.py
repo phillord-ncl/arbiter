@@ -310,3 +310,104 @@ def test_word_count_over_allowance_does_not_widen_the_lower_end(tmp_path):
         return results[0].score == 1
 
     assert [passes(n) for n in (299, 300, 550, 551)] == [False, True, True, False]
+
+
+# ---- show steps ------------------------------------------------------------
+
+
+def _context(tmp_path, build):
+    _, asked = _score(tmp_path, lambda m: (build(m), m.ask_for_score("?", 1))[1], answers=[1])
+    return asked[0].context
+
+
+def test_show_git_log_puts_the_history_in_front_of_the_marker(tmp_path):
+    _repo(tmp_path, ("Add readme", {"README.md": "hi"}), ("Fix typo", {"README.md": "ho"}))
+    context = _context(tmp_path, lambda m: m.show_git_log())
+    assert context[0].title == "Git log"
+    assert "Add readme" in context[0].text and "Fix typo" in context[0].text
+    assert "README.md" in context[0].text  # --stat
+
+
+def test_show_git_log_without_git_says_so(tmp_path):
+    context = _context(tmp_path, lambda m: m.show_git_log("History"))
+    assert (context[0].title, context[0].text) == ("History", "(no .git directory)")
+
+
+def test_show_files_gives_one_openable_item_per_file(tmp_path):
+    (tmp_path / "doc").mkdir()
+    (tmp_path / "doc" / "a.md").write_text("A")
+    (tmp_path / "doc" / "b.md").write_text("B")
+    (tmp_path / "x.py").write_text("")
+    context = _context(tmp_path, lambda m: m.show_files("doc/*.md"))
+    assert [(c.title, c.path) for c in context] == [
+        ("doc/a.md", str(tmp_path / "doc" / "a.md")),
+        ("doc/b.md", str(tmp_path / "doc" / "b.md")),
+    ]
+
+
+def test_show_files_with_no_match_says_so(tmp_path):
+    context = _context(tmp_path, lambda m: m.show_files("doc/*.md"))
+    assert "no file matching doc/*.md" in context[0].text
+
+
+def test_show_command_captures_output(tmp_path):
+    import sys
+
+    context = _context(
+        tmp_path,
+        lambda m: m.show_command("echo", [sys.executable, "-c", "print('hello')"]),
+    )
+    assert (context[0].title, context[0].text.strip()) == ("echo", "hello")
+
+
+def test_show_command_that_cannot_run_is_reported(tmp_path):
+    context = _context(tmp_path, lambda m: m.show_command("x", ["no-such-program-xyz"]))
+    assert "could not run no-such-program-xyz" in context[0].text
+
+
+def test_without_show_steps_every_file_is_listed_with_show_steps_only_those(tmp_path):
+    (tmp_path / "a.py").write_text("")
+    (tmp_path / "b.py").write_text("")
+    assert [c.title for c in _context(tmp_path, lambda m: None)] == ["a.py", "b.py"]
+    assert [c.title for c in _context(tmp_path, lambda m: m.show_files("a.py"))] == ["a.py"]
+
+
+def test_toml_builds_the_show_steps(tmp_path):
+    from arbiter.toml_exercise import load_exercise
+
+    arb = tmp_path / "arb.toml"
+    arb.write_text(
+        """
+[[marker]]
+criterion = "a"
+[[marker.step]]
+type = "show_git_log"
+[[marker.step]]
+type = "show_files"
+files = ["doc/*.md"]
+[[marker.step]]
+type = "show_command"
+title = "status"
+command = ["git", "status", "--short"]
+[[marker.step]]
+type = "ask_for_score"
+question = "?"
+out_of = 1
+"""
+    )
+    exercise, _ = load_exercise(str(arb), str(tmp_path))
+    assert len(exercise.markers[0].steps) == 4
+
+
+def test_plain_prompt_prints_shown_files_in_full(tmp_path, monkeypatch, capsys):
+    from arbiter.cli import _default_ask_interactively
+
+    (tmp_path / "a.md").write_text("the report\n")
+    (tmp_path / "b.py").write_text("code\n")
+    _, asked = _score(
+        tmp_path, lambda m: (m.show_files("a.md"), m.ask_for_score("?", 1))[1], answers=[1]
+    )
+    monkeypatch.setattr("builtins.input", lambda prompt: "1")
+    _default_ask_interactively(asked[0])
+    out = capsys.readouterr().out
+    assert "--- a.md" in out and "the report" in out and "code" not in out

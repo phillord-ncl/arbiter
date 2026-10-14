@@ -48,3 +48,18 @@ type = "ask_for_score"
 question = "Is the report in another place or length?"
 out_of = 1
 ```
+
+## Showing the marker things
+
+Some lines need a person to read something. These steps score nothing and
+choose what a later question shows:
+
+| `type` | shows |
+|--------|-------|
+| `show_git_log` | `git log` (default `--stat --date=short`; `args` replaces them), under `title` |
+| `show_files` | each file matching `files`, one tab each, which a viewer can open; the plain prompt prints them in full |
+| `show_command` | the output of `command` (a list of words, run in the project root) under `title` |
+
+Without any of these a question lists every file in the submission (as tabs,
+for a viewer); with one, it shows only what was chosen, after any
+"Automatic checks".
