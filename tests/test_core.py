@@ -225,3 +225,24 @@ def test_question_after_or_else_says_why(tmp_path):
 
     Exercise(marker).run(ask_interactively=ask)
     assert asked[0].context[0].title == "Why you are being asked"
+
+
+def test_question_session_tracks_progress(tmp_path):
+    script = tmp_path / "s.py"
+    script.write_text("print('x')\n")
+    marker = RunMarker(str(tmp_path), criterion="c")
+    marker.python(script.name).match_stdout(
+        3, Exact("x\n", "ok", 3)
+    ).ask_for_score("one", 4).ask_for_score("two", 5)
+    sessions = []
+
+    def ask(question):
+        sessions.append(question.session)
+        return Result(out_of=question.out_of, score=1, feedback="")
+
+    Exercise(marker).run(ask_interactively=ask, label="alice")
+    assert [(s.label, s.criterion, s.score, s.out_of, s.position, s.total)
+            for s in sessions] == [
+        ("alice", "c", 3, 12, 1, 2),
+        ("alice", "c", 4, 12, 2, 2),
+    ]

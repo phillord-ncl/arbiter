@@ -33,10 +33,28 @@ class ContextItem:
 
 
 @dataclass
+class Session:
+    """Where a marking session has got to, for a UI to show alongside a
+    question. ``label`` is whatever names the submission (for now its
+    directory name); ``score`` is the marks awarded so far and ``out_of``
+    the most the whole Exercise can award."""
+
+    label: str
+    criterion: Optional[str]
+    score: float
+    out_of: float
+    position: int
+    total: int
+
+
+@dataclass
 class Question:
     question: str
     out_of: float
     context: List[ContextItem] = field(default_factory=list)
+    ## Set by Exercise.run just before the question is asked, not by the
+    ## step that builds it -- a step knows nothing of the wider session.
+    session: Optional[Session] = None
 
 
 class _Undecided:
@@ -238,10 +256,17 @@ class Exercise:
     def __init__(self, *markers):
         self.markers = list(markers)
 
-    def run(self, ask_interactively, checkpoint=None):
+    def max_score(self):
+        return sum(marker.max_score() for marker in self.markers)
+
+    def score(self):
+        return sum(r.score for marker in self.markers for r in marker.results)
+
+    def run(self, ask_interactively, checkpoint=None, label=""):
         """``checkpoint``, if given, is called with this Exercise after the
         mechanical pass and after every human answer, so results can be
-        saved as they happen rather than only at the end."""
+        saved as they happen rather than only at the end. ``label`` names
+        the submission in each question's ``session``."""
         questions = []  # [(marker, step, ctx)], deferred to the second pass
         for marker in self.markers:
             ctx = RunContext()
@@ -266,8 +291,16 @@ class Exercise:
                 marker.result(held.undecided_result)
         if checkpoint is not None:
             checkpoint(self)
-        for marker, step, ctx in questions:
+        for position, (marker, step, ctx) in enumerate(questions, 1):
             question = step.action(ctx)
+            question.session = Session(
+                label,
+                marker.criterion,
+                self.score(),
+                self.max_score(),
+                position,
+                len(questions),
+            )
             answer = ask_interactively(question)
             answer.decided_by = "human"
             marker.result(answer)

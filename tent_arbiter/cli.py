@@ -98,7 +98,11 @@ def cli(submission, arb_path, output, also):
     dumper = Dumper(base, submission, rubric_toml, also)
     # Write after every human answer, not just at the end, so a crash
     # mid-marking keeps what was already entered.
-    exercise.run(ask_interactively=ask_interactively, checkpoint=dumper.write)
+    exercise.run(
+        ask_interactively=ask_interactively,
+        checkpoint=dumper.write,
+        label=os.path.basename(os.path.abspath(submission)),
+    )
     dumper.write(exercise, complete=True)
 
     for marker in exercise.markers:
