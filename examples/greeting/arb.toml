@@ -44,7 +44,7 @@ type = "ask_for_score"
 or_else = true
 out_of = 10
 question = """
-No expected output matched. The program printed:
+The program ran, but the output was not expected. It printed:
 {stdout}
 -- score out of 10? """
 

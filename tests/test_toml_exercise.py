@@ -46,7 +46,7 @@ def test_example_explicit_zero_does_not_ask(tmp_path):
 
 def test_example_undecided_asks_and_quotes_stdout(tmp_path):
     output = _run_example(tmp_path, "odd", "6\n2\n")
-    assert "The program printed:\nGreetings, Ada" in output
+    assert "It printed:\nGreetings, Ada" in output
     assert "correctness: 6.0/10 -- marker-entered" in output
 
 

@@ -14,7 +14,7 @@ import sys
 import click
 
 from .config import ConfigError, load_viewer
-from .core import Result
+from .core import UNDECIDED_NOTE, Result
 from .dump import FILENAME, FORMATS, Dumper
 from .toml_exercise import ArbTomlError, load_exercise
 
@@ -27,6 +27,8 @@ def _load_arb(path):
 
 
 def _default_ask_interactively(question):
+    if question.undecided:
+        click.echo(UNDECIDED_NOTE)
     for item in question.context:
         click.echo("--- {}".format(item.title))
         if item.text is not None:

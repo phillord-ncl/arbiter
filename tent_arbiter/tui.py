@@ -10,7 +10,7 @@ from textual.binding import Binding
 from textual.containers import VerticalScroll
 from textual.widgets import Footer, Input, Label, Static, TabbedContent, TabPane
 
-from .core import Result
+from .core import UNDECIDED_NOTE, Result
 
 
 def _header_text(question):
@@ -25,6 +25,13 @@ def _header_text(question):
         session.position,
         session.total,
     )
+
+
+def _question_text(question):
+    text = question.question.rstrip()
+    if question.undecided:
+        text += "\n\n" + UNDECIDED_NOTE
+    return text
 
 
 def _item_text(item):
@@ -57,11 +64,13 @@ class QuestionApp(App):
     def compose(self) -> ComposeResult:
         yield Label(_header_text(self.question), id="header")
         with TabbedContent(id="context"):
+            with TabPane("Question", id="question"):
+                with VerticalScroll():
+                    yield Static(_question_text(self.question), markup=False)
             for i, item in enumerate(self.question.context):
                 with TabPane(item.title, id="item{}".format(i)):
                     with VerticalScroll():
                         yield Static(_item_text(item), markup=False)
-        yield Label(self.question.question.rstrip(), id="prompt", markup=False)
         yield Input(
             placeholder="score (0 to {})".format(self.question.out_of), id="score"
         )

@@ -205,10 +205,10 @@ def test_question_context_has_output_and_files(tmp_path):
     assert context["stderr"].text == "err\n"
     assert context["s.py"].path == str(script)
     assert "arb-results.toml" not in context
-    assert "Question" not in context
+    assert not asked[0].undecided
 
 
-def test_question_after_or_else_says_why(tmp_path):
+def test_question_after_or_else_is_marked_undecided(tmp_path):
     from tent_arbiter.matchers import Exact
 
     script = tmp_path / "s.py"
@@ -224,7 +224,7 @@ def test_question_after_or_else_says_why(tmp_path):
         return Result(out_of=question.out_of, score=0, feedback="")
 
     Exercise(marker).run(ask_interactively=ask)
-    assert asked[0].context[0].title == "Question"
+    assert asked[0].undecided
 
 
 def test_question_session_tracks_progress(tmp_path):

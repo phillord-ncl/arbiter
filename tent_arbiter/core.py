@@ -22,6 +22,9 @@ class Result:
     decided_by: str = "mechanical"
 
 
+UNDECIDED_NOTE = "(The automatic checks could not decide this one.)"
+
+
 @dataclass
 class ContextItem:
     """One titled block shown alongside a question: literal ``text``, or
@@ -52,6 +55,9 @@ class Question:
     question: str
     out_of: float
     context: List[ContextItem] = field(default_factory=list)
+    ## True when the automatic checks could not decide and this question
+    ## took over (a step after or_else()); a UI may mention it, quietly.
+    undecided: bool = False
     ## Set by Exercise.run just before the question is asked, not by the
     ## step that builds it -- a step knows nothing of the wider session.
     session: Optional[Session] = None
@@ -235,19 +241,12 @@ class RunMarker(DirectoryMarker):
         def action(ctx):
             text = question(ctx) if callable(question) else question
             context = []
-            if after_or_else:
-                context.append(
-                    ContextItem(
-                        "Question",
-                        text="The automatic checks could not decide this one.",
-                    )
-                )
             process = getattr(ctx, "completed_process", None)
             if process is not None:
                 context.append(ContextItem("stdout", text=process.stdout))
                 context.append(ContextItem("stderr", text=process.stderr))
             context.extend(self._submission_files())
-            return Question(text, out_of, context)
+            return Question(text, out_of, context, undecided=after_or_else)
 
         return self._step(False, action, out_of=out_of)
 

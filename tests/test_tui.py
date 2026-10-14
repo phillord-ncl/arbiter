@@ -46,3 +46,19 @@ def test_out_of_range_score_is_refused(tmp_path):
 
     asyncio.run(go())
     assert app.result is None
+
+
+def test_question_tab_shows_the_question_text(tmp_path):
+    from textual.widgets import TabbedContent
+
+    question = _question(tmp_path)
+    question.question = "Is the style good? "
+    app = QuestionApp(question)
+
+    async def go():
+        async with app.run_test():
+            assert app.query_one(TabbedContent).active == "question"
+            texts = [str(w.render()) for w in app.query("Static")]
+            assert any("Is the style good?" in t for t in texts)
+
+    asyncio.run(go())
