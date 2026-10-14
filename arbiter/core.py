@@ -68,6 +68,21 @@ class Question:
     ## True when the automatic checks could not decide and this question
     ## took over (a step after or_else()); a UI may mention it, quietly.
     undecided: bool = False
+    ## The only scores a marker may enter (e.g. 0, 0.5, 1) -- None means
+    ## any number from 0 to ``out_of``. A deduction is just a scale that
+    ## goes below zero, e.g. choices of (0, -1) with an out_of of 0.
+    choices: Optional[List[float]] = None
+
+    def accepts(self, score):
+        if self.choices is not None:
+            return score in self.choices
+        return 0 <= score <= self.out_of
+
+    def allowed(self):
+        """What may be entered, as text for a prompt."""
+        if self.choices is not None:
+            return "one of " + ", ".join(format(c, "g") for c in self.choices)
+        return "a number from 0 to {}".format(format(self.out_of, "g"))
 
 
 class _Undecided:
@@ -115,7 +130,13 @@ class RunContext:
 
 
 class Marker:
-    def __init__(self, criterion=None, title=None, task=None):
+    def __init__(self, criterion=None, title=None, task=None, part=None, formative=False):
+        ## Which part of the assignment this Marker belongs to, for
+        ## subtotals; None means not in any part.
+        self.part = part
+        ## A formative Marker is recorded and shown but counts for nothing:
+        ## it adds nothing to the Exercise's score or total available.
+        self.formative = formative
         ## A human-readable name for what this Marker marks, shown to
         ## whoever is marking; ``criterion`` stays the stable id.
         self.title = title
@@ -196,8 +217,8 @@ class DirectoryMarker(Marker):
     file within it to act on, rather than a Marker being tied to one
     fixed file."""
 
-    def __init__(self, directory, criterion=None, title=None, task=None):
-        super().__init__(criterion=criterion, title=title, task=task)
+    def __init__(self, directory, criterion=None, title=None, task=None, **kwargs):
+        super().__init__(criterion=criterion, title=title, task=task, **kwargs)
         self.directory = directory
 
 
@@ -252,11 +273,12 @@ class RunMarker(DirectoryMarker):
             ),
         )
 
-    def ask_for_score(self, question, out_of):
+    def ask_for_score(self, question, out_of, choices=None):
         """``question`` may be a plain string, or a callable taking the
         Marker's own RunContext -- e.g. to quote the script's own stdout
         back in the question text. Either way it is not actually called
-        until the second pass.
+        until the second pass. ``choices``, if given, are the only scores
+        the marker may enter, in place of any number up to ``out_of``.
         """
 
         after_or_else = self._next_is_fallback
@@ -269,7 +291,13 @@ class RunMarker(DirectoryMarker):
                 context.append(ContextItem("stdout", text=process.stdout))
                 context.append(ContextItem("stderr", text=process.stderr))
             context.extend(self._submission_files())
-            return Question(text, out_of, context, undecided=after_or_else)
+            return Question(
+                text,
+                out_of,
+                context,
+                undecided=after_or_else,
+                choices=list(choices) if choices is not None else None,
+            )
 
         return self._step(False, action, out_of=out_of)
 
@@ -300,11 +328,31 @@ class Exercise:
             except OSError:
                 pass
 
+    def counted(self):
+        """The Markers that count towards the total (not the formative)."""
+        return [m for m in self.markers if not m.formative]
+
     def max_score(self):
-        return sum(marker.max_score() for marker in self.markers)
+        return sum(marker.max_score() for marker in self.counted())
 
     def score(self):
-        return sum(r.score for marker in self.markers for r in marker.results)
+        return sum(r.score for marker in self.counted() for r in marker.results)
+
+    def parts(self):
+        """``[(part, score, out_of)]`` for each named part, in the order
+        each first appears; Markers with no part are left out."""
+        names = []
+        for marker in self.counted():
+            if marker.part is not None and marker.part not in names:
+                names.append(marker.part)
+        return [
+            (
+                name,
+                sum(r.score for m in self.counted() if m.part == name for r in m.results),
+                sum(m.max_score() for m in self.counted() if m.part == name),
+            )
+            for name in names
+        ]
 
     def run(self, ask_interactively, checkpoint=None, label=""):
         """``checkpoint``, if given, is called with this Exercise after the

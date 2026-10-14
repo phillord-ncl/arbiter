@@ -12,6 +12,8 @@ still needs an ``arb.py``. Layout::
                                          # (default: the rubric's description)
     task = "Print a greeting"            # optional: what the student was asked
                                          # (default: the rubric's long_description)
+    part = "Part 1"                      # optional: group markers for subtotals
+    formative = true                     # optional: recorded, but counts for nothing
 
     [[marker.step]]
     type = "python"                      # entry point, in the submission
@@ -32,6 +34,9 @@ still needs an ``arb.py``. Layout::
     or_else = true                       # only if nothing above decided
     question = "It printed:\\n{stdout}\\n-- score out of 10? "
     out_of = 10
+    choices = [0, 5, 10]                 # optional: the only scores allowed
+                                         # (negative ones make a deduction,
+                                         # with out_of = 0)
 
 A question may use ``{stdout}`` and ``{stderr}`` (from the marker's own
 ``python`` step; empty if there was none) and ``{file}``, the contents of
@@ -98,7 +103,9 @@ def _add_step(marker, spec, where, directory):
             ]
             marker.match_stdout(spec["out_of"], *matchers)
         elif kind == "ask_for_score":
-            marker.ask_for_score(_question(spec, directory), spec["out_of"])
+            marker.ask_for_score(
+                _question(spec, directory), spec["out_of"], spec.get("choices")
+            )
         else:
             raise ArbTomlError(
                 "{}: unknown step type {!r} (want one of python, "
@@ -122,6 +129,8 @@ def load_exercise(path, submission_dir):
             criterion=spec.get("criterion"),
             title=spec.get("title"),
             task=spec.get("task"),
+            part=spec.get("part"),
+            formative=spec.get("formative", False),
         )
         for j, step in enumerate(spec.get("step", [])):
             _add_step(marker, step, "{} step {}".format(where, j + 1), submission_dir)

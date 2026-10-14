@@ -106,7 +106,7 @@ class QuestionApp(App):
             with VerticalScroll(id="marked"):
                 yield Static(_marked_text(self.question), markup=False)
         yield Input(
-            placeholder="score (0 to {})".format(self.question.out_of), id="score"
+            placeholder="score ({})".format(self.question.allowed()), id="score"
         )
         yield Input(placeholder="feedback", id="feedback")
         yield Footer()
@@ -145,9 +145,9 @@ class QuestionApp(App):
             score = float(text) if text else 0.0
         except ValueError:
             score = None
-        if score is None or not 0 <= score <= self.question.out_of:
+        if score is None or not self.question.accepts(score):
             self.notify(
-                "Score must be a number from 0 to {}".format(self.question.out_of),
+                "Score must be {}".format(self.question.allowed()),
                 severity="error",
             )
             self.query_one("#score").focus()

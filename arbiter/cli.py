@@ -35,8 +35,15 @@ def _default_ask_interactively(question):
         click.echo("--- {}".format(item.title))
         if item.text is not None:
             click.echo(item.text)
-    answer = input(question.question)
-    score = float(answer) if answer.strip() else 0.0
+    while True:
+        answer = input(question.question)
+        try:
+            score = float(answer) if answer.strip() else 0.0
+        except ValueError:
+            score = None
+        if score is not None and question.accepts(score):
+            break
+        click.echo("Please enter {}.".format(question.allowed()))
     return Result(out_of=question.out_of, score=score, feedback="marker-entered")
 
 

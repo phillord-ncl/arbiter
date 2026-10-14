@@ -24,6 +24,8 @@ def report(exercise, submission, rubric, complete):
             "out_of": r.out_of,
             "feedback": r.feedback,
             "decided_by": r.decided_by,
+            "part": marker.part or "",
+            "formative": marker.formative,
         }
         for marker in exercise.markers
         for r in marker.results
@@ -32,8 +34,12 @@ def report(exercise, submission, rubric, complete):
         "submission": os.path.abspath(submission),
         "rubric": os.path.abspath(rubric) if rubric else "",
         "complete": complete,
-        "score": sum(r["score"] for r in results),
-        "out_of": sum(r["out_of"] for r in results),
+        "score": exercise.score(),
+        "out_of": exercise.max_score(),
+        "parts": [
+            {"part": name, "score": score, "out_of": out_of}
+            for name, score, out_of in exercise.parts()
+        ],
         "results": results,
     }
 
@@ -48,8 +54,14 @@ def _value(v):
 
 def render_toml(data):
     lines = [
-        "{} = {}".format(k, _value(v)) for k, v in data.items() if k != "results"
+        "{} = {}".format(k, _value(v))
+        for k, v in data.items()
+        if k not in ("results", "parts")
     ]
+    for part in data["parts"]:
+        lines.append("")
+        lines.append("[[part]]")
+        lines.extend("{} = {}".format(k, _value(v)) for k, v in part.items())
     for r in data["results"]:
         lines.append("")
         lines.append("[[result]]")
@@ -60,9 +72,20 @@ def render_toml(data):
 def render_text(data):
     lines = []
     for r in data["results"]:
-        lines.append("{}: {}/{}".format(r["criterion"], r["score"], r["out_of"]))
+        lines.append(
+            "{}: {}/{}{}".format(
+                r["criterion"],
+                r["score"],
+                r["out_of"],
+                " (formative, not counted)" if r["formative"] else "",
+            )
+        )
         lines.append("  {}".format(r["feedback"]))
     lines.append("")
+    for part in data["parts"]:
+        lines.append(
+            "{}: {}/{}".format(part["part"], part["score"], part["out_of"])
+        )
     lines.append("Total: {}/{}".format(data["score"], data["out_of"]))
     if not data["complete"]:
         lines.append("(marking not finished)")
