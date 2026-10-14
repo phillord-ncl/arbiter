@@ -27,6 +27,8 @@ def _load_arb(path):
 
 
 def _default_ask_interactively(question):
+    if question.session is not None and question.session.task:
+        click.echo("Task: {}".format(question.session.task))
     if question.undecided:
         click.echo(UNDECIDED_NOTE)
     for item in question.context:
@@ -127,6 +129,9 @@ def cli(submission, arb_path, output, also, tui):
                     arb_path, rubric_toml, "\n".join(problems)
                 )
             )
+
+    if rubric_toml is not None:
+        exercise.apply_rubric(rubric_toml)
 
     base = os.path.join(submission, FILENAME)
     if output is not None:

@@ -262,3 +262,60 @@ def test_marker_title_is_what_the_session_shows(tmp_path):
     Exercise(marker).run(ask_interactively=ask)
     assert sessions[0].criterion == "The nice name"
     assert marker.criterion == "c"
+
+
+RUBRIC = """\
+[assignment]
+title = "A"
+description = "a.md"
+points_possible = 5
+
+[[criteria]]
+id = "c"
+description = "Nice name"
+long_description = "What they were asked."
+points = 5
+"""
+
+
+def _rubric_exercise(tmp_path, **marker_kwargs):
+    (tmp_path / "r.rubric.toml").write_text(RUBRIC)
+    (tmp_path / "a.md").write_text("The whole assignment\n")
+    marker = RunMarker(str(tmp_path), criterion="c", **marker_kwargs)
+    marker.ask_for_score("q", 5)
+    exercise = Exercise(marker)
+    exercise.apply_rubric(str(tmp_path / "r.rubric.toml"))
+    return exercise
+
+
+def _first_session(exercise):
+    sessions = []
+
+    def ask(question):
+        sessions.append(question.session)
+        return Result(out_of=question.out_of, score=1, feedback="")
+
+    exercise.run(ask_interactively=ask)
+    return sessions[0]
+
+
+def test_rubric_supplies_name_task_and_assignment(tmp_path):
+    session = _first_session(_rubric_exercise(tmp_path))
+    assert session.criterion == "Nice name"
+    assert session.task == "What they were asked."
+    assert session.assignment == "The whole assignment\n"
+
+
+def test_marker_title_and_task_beat_the_rubric(tmp_path):
+    session = _first_session(
+        _rubric_exercise(tmp_path, title="Mine", task="My task")
+    )
+    assert (session.criterion, session.task) == ("Mine", "My task")
+
+
+def test_missing_assignment_file_is_fine(tmp_path):
+    exercise = _rubric_exercise(tmp_path)
+    (tmp_path / "a.md").unlink()
+    exercise.assignment_text = None
+    exercise.apply_rubric(str(tmp_path / "r.rubric.toml"))
+    assert _first_session(exercise).assignment is None

@@ -51,6 +51,10 @@ class Session:
     ## (criterion, Result) for everything marked so far, automatic or
     ## human, in the order it was decided.
     marked: List[Tuple[Optional[str], Result]] = field(default_factory=list)
+    ## What the student was asked: this criterion's task text, and the
+    ## whole assignment's description. Either may be None.
+    task: Optional[str] = None
+    assignment: Optional[str] = None
 
 
 @dataclass
@@ -111,10 +115,15 @@ class RunContext:
 
 
 class Marker:
-    def __init__(self, criterion=None, title=None):
+    def __init__(self, criterion=None, title=None, task=None):
         ## A human-readable name for what this Marker marks, shown to
         ## whoever is marking; ``criterion`` stays the stable id.
         self.title = title
+        ## What the student was asked, for this Marker. Explicit, or
+        ## filled in from the rubric by Exercise.apply_rubric.
+        self.task = task
+        self.rubric_title = None
+        self.rubric_task = None
         ## Which tent-pole .rubric.toml criterion (by its own "id", not
         ## a Canvas id -- those aren't stable, see tent-pole's
         ## rubric.py) this Marker's results count towards. None means
@@ -127,7 +136,11 @@ class Marker:
 
     @property
     def name(self):
-        return self.title or self.criterion
+        return self.title or self.rubric_title or self.criterion
+
+    @property
+    def task_text(self):
+        return self.task or self.rubric_task
 
     def _step(self, mechanical, action, out_of=None, undecided_result=None):
         self.steps.append(
@@ -183,8 +196,8 @@ class DirectoryMarker(Marker):
     file within it to act on, rather than a Marker being tied to one
     fixed file."""
 
-    def __init__(self, directory, criterion=None, title=None):
-        super().__init__(criterion=criterion, title=title)
+    def __init__(self, directory, criterion=None, title=None, task=None):
+        super().__init__(criterion=criterion, title=title, task=task)
         self.directory = directory
 
 
@@ -264,6 +277,28 @@ class RunMarker(DirectoryMarker):
 class Exercise:
     def __init__(self, *markers):
         self.markers = list(markers)
+        self.assignment_text = None
+
+    def apply_rubric(self, path):
+        """Take what a marker is called, and what the student was asked,
+        from the rubric's criteria (a marker's own ``title`` and ``task``
+        still win), and the assignment's description from the markdown
+        file the rubric names, if that file exists."""
+        parsed = load_rubric_toml(path)
+        criteria = {c["id"]: c for c in parsed.get("criteria", [])}
+        for marker in self.markers:
+            criterion = criteria.get(marker.criterion)
+            if criterion is not None:
+                marker.rubric_title = criterion.get("description")
+                marker.rubric_task = (criterion.get("long_description") or "").strip() or None
+        description = parsed.get("assignment", {}).get("description")
+        if description:
+            md = os.path.join(os.path.dirname(os.path.abspath(path)), description)
+            try:
+                with open(md) as f:
+                    self.assignment_text = f.read()
+            except OSError:
+                pass
 
     def max_score(self):
         return sum(marker.max_score() for marker in self.markers)
@@ -310,6 +345,8 @@ class Exercise:
                 position,
                 len(questions),
                 [(m.name, r) for m in self.markers for r in m.results],
+                marker.task_text,
+                self.assignment_text,
             )
             answer = ask_interactively(question)
             answer.decided_by = "human"

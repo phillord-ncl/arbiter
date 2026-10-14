@@ -80,3 +80,21 @@ def test_header_and_marked_panel(tmp_path):
     marked = _marked_text(question)
     assert "[AUTO] output: 7/10" in marked
     assert "[you] style: 1/2" in marked
+
+
+def test_question_tab_shows_task_and_assignment_tab(tmp_path):
+    from textual.widgets import TabbedContent
+
+    question = _question(tmp_path)
+    question.session.task = "Print a greeting"
+    question.session.assignment = "The whole assignment"
+    app = QuestionApp(question)
+
+    async def go():
+        async with app.run_test():
+            texts = [str(w.render()) for w in app.query("Static")]
+            assert any("Task: Print a greeting" in t for t in texts)
+            assert any(t == "The whole assignment" for t in texts)
+            assert app.query_one(TabbedContent).get_tab("assignment")
+
+    asyncio.run(go())

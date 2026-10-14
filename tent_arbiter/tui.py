@@ -49,7 +49,10 @@ def _question_text(question):
     heading = "{}out of {}".format(
         "{}: ".format(criterion) if criterion else "", question.out_of
     )
-    text = heading + "\n\n" + question.question.rstrip()
+    text = heading + "\n"
+    if session is not None and session.task:
+        text += "\nTask: " + session.task + "\n"
+    text += "\n" + question.question.rstrip()
     if question.undecided:
         text += "\n\n" + UNDECIDED_NOTE
     return text
@@ -91,6 +94,11 @@ class QuestionApp(App):
                 with TabPane("Question", id="question"):
                     with VerticalScroll():
                         yield Static(_question_text(self.question), markup=False)
+                session = self.question.session
+                if session is not None and session.assignment:
+                    with TabPane("Assignment", id="assignment"):
+                        with VerticalScroll():
+                            yield Static(session.assignment, markup=False)
                 for i, item in enumerate(self.question.context):
                     with TabPane(item.title, id="item{}".format(i)):
                         with VerticalScroll():
