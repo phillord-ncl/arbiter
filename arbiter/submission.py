@@ -1,8 +1,9 @@
-"""Finding things in a submission: its root, and its own files.
+"""Finding things in a submission's own files.
 
-Real submissions are not laid out uniformly -- an upload may be wrapped in
-one or more extra directories -- so checks look for what they want rather
-than assuming a fixed layout.
+Submissions are not laid out uniformly, so checks look for what they want
+(by case-insensitive glob, anywhere under the project directory) rather
+than assuming a fixed layout. Where the project directory is, is for the
+Exercise's ``root`` to say, not for us to guess.
 """
 
 import fnmatch
@@ -23,34 +24,6 @@ def _noise(name):
         or scripts.is_ours(name)
         or name.startswith("arb-results.")
     )
-
-
-## What marks a directory as the student's project, besides a ``.git``.
-PROJECT_FILES = ("requirements.txt", "pyproject.toml", "setup.py", "*.py")
-
-
-def _is_project(path, names):
-    return os.path.exists(os.path.join(path, ".git")) or any(
-        fnmatch.fnmatchcase(n.lower(), p) for n in names for p in PROJECT_FILES
-    )
-
-
-def submission_root(directory, depth=3):
-    """The directory the student's project actually lives in: going down
-    through directories that hold nothing else, the first that looks like a
-    project (a ``.git``, a ``requirements.txt``, Python files...). If none
-    does, ``directory`` itself."""
-    current = directory
-    for _ in range(depth + 1):
-        names = [n for n in sorted(os.listdir(current)) if not _noise(n)]
-        if _is_project(current, names):
-            return current
-        dirs = [n for n in names if os.path.isdir(os.path.join(current, n))]
-        if len(names) == 1 and len(dirs) == 1:
-            current = os.path.join(current, dirs[0])
-        else:
-            break
-    return directory
 
 
 def walk(root):

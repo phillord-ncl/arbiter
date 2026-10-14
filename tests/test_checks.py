@@ -52,32 +52,7 @@ def _score(tmp_path, build, answers=()):
     return marker.results, asked
 
 
-# ---- finding the submission ------------------------------------------------
-
-
-def test_root_is_found_through_wrapper_directories(tmp_path):
-    _repo(tmp_path / "id" / "project", ("one", {"a.py": ""}))
-    assert submission.submission_root(str(tmp_path)) == str(tmp_path / "id" / "project")
-
-
-def test_root_ignores_macos_noise_and_our_files(tmp_path):
-    _repo(tmp_path / "project", ("one", {"a.py": ""}))
-    (tmp_path / "__MACOSX").mkdir()
-    (tmp_path / ".DS_Store").write_text("")
-    (tmp_path / "marker-python").write_text("")
-    assert submission.submission_root(str(tmp_path)) == str(tmp_path / "project")
-
-
-def test_root_without_a_git_directory_is_still_the_inner_project(tmp_path):
-    (tmp_path / "project").mkdir()
-    (tmp_path / "project" / "a.py").write_text("")
-    assert submission.submission_root(str(tmp_path)) == str(tmp_path / "project")
-
-
-def test_root_is_the_directory_when_it_is_not_just_a_wrapper(tmp_path):
-    (tmp_path / "sub").mkdir()
-    (tmp_path / "a.py").write_text("")
-    assert submission.submission_root(str(tmp_path)) == str(tmp_path)
+# ---- finding files in the submission ---------------------------------------
 
 
 def test_walk_skips_hidden_virtualenv_and_our_files(tmp_path):
@@ -235,14 +210,6 @@ def test_git_log_matches_messages_and_diffs(tmp_path):
     results, _ = _score(tmp_path, lambda m: m.git_log_matches(1, "print", diffs=False))
     assert results[0].score == 0
     results, _ = _score(tmp_path, lambda m: m.git_log_matches(1, "START", diffs=False))
-    assert results[0].score == 1
-
-
-def test_checks_work_when_the_project_is_in_a_wrapper_directory(tmp_path):
-    _repo(tmp_path / "project", ("one", {"README.md": "hi"}))
-    results, _ = _score(tmp_path, lambda m: m.file_exists(1, "README.md"))
-    assert results[0].score == 1
-    results, _ = _score(tmp_path, lambda m: m.git_commit_count(1, 1))
     assert results[0].score == 1
 
 
@@ -427,3 +394,62 @@ def test_file_exists_can_require_every_pattern(tmp_path):
     assert missing.score == 0 and "licen[cs]e.md" in missing.feedback
     (tmp_path / "LICENCE.md").write_text("")
     assert score("readme.md", "licen[cs]e.md").score == 1
+
+
+# ---- the project root ------------------------------------------------------
+
+ONE_STEP = (
+    '[[marker]]\ncriterion="a"\n[[marker.step]]\ntype="file_exists"\n'
+    'files="README.md"\nout_of=1\n'
+)
+
+
+def _wrapped(tmp_path, arb_head=""):
+    """A submission with its project one directory down."""
+    _repo(tmp_path / "sub" / "project", ("one", {"README.md": "hi"}))
+    arb = tmp_path / "arb.toml"
+    arb.write_text(arb_head + ONE_STEP)
+    return arb, tmp_path / "sub"
+
+
+def test_toml_root_points_the_markers_at_the_project(tmp_path):
+    from arbiter.toml_exercise import load_exercise
+
+    arb, sub = _wrapped(tmp_path, 'root = "project"\n')
+    exercise, _ = load_exercise(str(arb), str(sub))
+    assert exercise.directory == str(sub / "project")
+    assert exercise.markers[0].directory == str(sub / "project")
+
+
+def test_root_argument_beats_the_toml(tmp_path):
+    from arbiter.toml_exercise import load_exercise
+
+    arb, sub = _wrapped(tmp_path, 'root = "elsewhere"\n')
+    exercise, _ = load_exercise(str(arb), str(sub), root="project")
+    assert exercise.directory == str(sub / "project")
+
+
+def test_no_root_means_the_submission_itself(tmp_path):
+    from arbiter.toml_exercise import load_exercise
+
+    arb, sub = _wrapped(tmp_path)
+    exercise, _ = load_exercise(str(arb), str(sub))
+    assert exercise.directory == str(sub)
+    # Files are still searched for anywhere under the root.
+    assert submission.find(str(sub), "README.md") == ["project/README.md"]
+
+
+def test_cli_root_option_and_scripts_go_in_the_project(tmp_path):
+    from click.testing import CliRunner
+
+    from arbiter.cli import cli
+
+    arb, sub = _wrapped(tmp_path, 'python_version = "3"\n')
+    result = CliRunner().invoke(
+        cli, ["--arb", str(arb), "--no-tui", "--root", "project", str(sub)]
+    )
+    assert result.exit_code == 0, result.output
+    assert "a: 1/1" in result.output
+    assert (sub / "project" / "marker-python").exists()
+    assert not (sub / "marker-python").exists()
+    assert (sub / "arb-results.toml").exists()  # results stay beside the submission

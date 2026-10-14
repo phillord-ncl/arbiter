@@ -23,10 +23,13 @@ file's name wherever it is; one with a `/` (`doc/*.md`) matches the path from
 the project root. Hidden directories, virtualenvs, bytecode caches and
 `marker-*` files are never searched.
 
-The project root is found for you: if an upload is wrapped in extra
-directories, `arbiter` goes down through them to the first that looks like a project (a `.git`, `requirements.txt`, `pyproject.toml`, `setup.py` or a `.py` file).
-Git is never looked for above that, so a submission with no `.git` does not
-borrow a parent's history.
+Where the project is comes from the `arb.toml`, not a guess: `root =
+"project"` at the top says it is the `project` directory inside each
+submission (default: the submission itself). For an odd upload, say a
+student's zip with extra directories inside, `--root some/dir` on the command
+line overrides it for that run. Git is only looked for in the project
+directory itself, never above it, so a submission with no `.git` does not
+borrow a parent's history. The `marker-*` scripts are written there too.
 
 ```toml
 [[marker.step]]

@@ -253,9 +253,9 @@ class DirectoryMarker(Marker):
 
     @property
     def root(self):
-        """Where the student's project is: ``directory``, or a directory
-        inside it (see arbiter.submission.submission_root)."""
-        return submission.submission_root(self.directory)
+        """Where the student's project is. A Marker is pointed at it
+        directly (the Exercise's ``root`` has already been applied)."""
+        return self.directory
 
 
     def _check(self, out_of, check):
@@ -517,6 +517,9 @@ class Exercise:
     def __init__(self, *markers):
         self.markers = list(markers)
         self.assignment_text = None
+        ## The student's project directory, where the Markers look. None
+        ## until something that knows it (arb.toml's loader) sets it.
+        self.directory = None
         ## Whether to write marker-* scripts into each submission, which
         ## extra ones (marker_scripts.Script), and the venv's Python version.
         self.use_scripts = False
@@ -527,14 +530,13 @@ class Exercise:
         return marker_scripts.BUILTIN + self.scripts
 
     def prepare(self, directory):
-        """Write the marker-* scripts into ``directory``, if this Exercise
+        """Write the marker-* scripts into ``directory`` (the project
+        directory, where its ``requirements.txt`` is), if this Exercise
         uses them. Raises ``arbiter.scripts.ScriptClash`` (writing nothing)
         if the submission already has something of that name."""
         if self.use_scripts:
             marker_scripts.write_scripts(
-                submission.submission_root(directory),
-                self.all_scripts(),
-                self.python_version,
+                directory, self.all_scripts(), self.python_version
             )
 
     def apply_rubric(self, path):

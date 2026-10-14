@@ -6,6 +6,10 @@ still needs an ``arb.py``. Layout::
 
     rubric = "greeting.rubric.toml"      # optional, relative to this file
     python_version = "3.14"              # optional: the marker-venv's Python
+    root = "project"                     # optional: the student's project, a
+                                         # directory inside each submission
+                                         # (default: the submission itself;
+                                         # ``--root`` on the command line wins)
 
     [[script]]                           # optional: a marker-* command, run in
     name = "marker-run"                  # the submission's venv, as well as the
@@ -184,11 +188,16 @@ def _add_step(marker, spec, where, directory):
         raise ArbTomlError("{}: missing {}".format(where, e)) from None
 
 
-def load_exercise(path, submission_dir):
+def load_exercise(path, submission_dir, root=None):
     """Return ``(exercise, rubric_path)``; ``rubric_path`` is None if the
-    file names no rubric."""
+    file names no rubric. ``exercise.directory`` is the project directory:
+    ``root`` (else the file's own ``root``, else none) inside
+    ``submission_dir``."""
     with open(path, "rb") as f:
         data = tomllib.load(f)
+    root = root or data.get("root")
+    if root:
+        submission_dir = os.path.join(submission_dir, root)
 
     markers = []
     for i, spec in enumerate(data.get("marker", [])):
@@ -208,6 +217,7 @@ def load_exercise(path, submission_dir):
         raise ArbTomlError("{} defines no [[marker]]".format(path))
 
     exercise = Exercise(*markers)
+    exercise.directory = submission_dir
     exercise.python_version = data.get("python_version")
     for i, spec in enumerate(data.get("script", [])):
         try:

@@ -17,7 +17,6 @@ from .config import ConfigError, load_terminal, load_viewer
 from .core import UNDECIDED_NOTE, RestartMarking, Result
 from .dump import FILENAME, FORMATS, Dumper, load_previous
 from .scripts import ScriptClash
-from .submission import submission_root
 from .toml_exercise import ArbTomlError, load_exercise
 
 
@@ -136,6 +135,13 @@ def _find_arb():
          "written.",
 )
 @click.option(
+    "--root",
+    "root",
+    default=None,
+    help="The student's project, a directory inside SUBMISSION, overriding "
+         "the arb.toml's root (for an odd upload).",
+)
+@click.option(
     "--fresh",
     is_flag=True,
     help="Ignore answers stored in an earlier results file for this "
@@ -148,17 +154,19 @@ def _find_arb():
     help="Answer questions in the terminal UI (needs the tui extra). "
          "Default: use it if installed and running in a terminal.",
 )
-def cli(submission, arb_path, output, also, fresh, tui):
+def cli(submission, arb_path, output, also, root, fresh, tui):
     arb_path = arb_path or _find_arb()
     if arb_path.endswith(".toml"):
         try:
-            exercise, rubric_toml = load_exercise(arb_path, submission)
+            exercise, rubric_toml = load_exercise(arb_path, submission, root)
         except ArbTomlError as e:
             raise click.ClickException("{}: {}".format(arb_path, e))
         ask_interactively = _choose_ask(tui)
     else:
         module = _load_arb(arb_path)
-        exercise = module.build(submission)
+        project_dir = os.path.join(submission, root) if root else submission
+        exercise = module.build(project_dir)
+        exercise.directory = project_dir
         rubric_toml = getattr(module, "RUBRIC_TOML", None)
         ask_interactively = getattr(module, "ask_interactively", None) or _choose_ask(
             tui
@@ -179,6 +187,7 @@ def cli(submission, arb_path, output, also, fresh, tui):
     base = os.path.join(submission, FILENAME)
     if output is not None:
         base = output[: -len(".toml")] if output.endswith(".toml") else output
+    project = exercise.directory or submission
     dumper = Dumper(base, submission, rubric_toml, also)
     try:
         previous = load_previous(base + ".toml")
@@ -188,7 +197,7 @@ def cli(submission, arb_path, output, also, fresh, tui):
             "--fresh".format(base, e)
         )
     try:
-        exercise.prepare(submission)
+        exercise.prepare(project)
     except ScriptClash as e:
         raise click.ClickException(str(e))
     # Write after every human answer, not just at the end, so a crash
@@ -197,7 +206,7 @@ def cli(submission, arb_path, output, also, fresh, tui):
         ask_interactively=ask_interactively,
         checkpoint=dumper.write,
         label=os.path.basename(os.path.abspath(submission)),
-        directory=submission_root(os.path.abspath(submission)),
+        directory=os.path.abspath(project),
         previous=None if fresh else previous,
     )
     dumper.write(exercise, complete=True)
