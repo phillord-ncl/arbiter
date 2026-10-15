@@ -274,14 +274,20 @@ def cli(submissions, recursive, arb_path, output, also, root, fresh, tui):
         else:
             todo.append(submission)
 
-    for i, submission in enumerate(todo):
-        name = os.path.basename(os.path.abspath(submission))
-        _mark(submission, arb_path, output, also, root, fresh, choose, batch)
-        progress.finished(name)
-        if i + 1 < len(todo):
-            upcoming = os.path.basename(os.path.abspath(todo[i + 1]))
-            if not _confirm_next(chosen, name, upcoming, progress):
-                raise click.Abort()
+    ## The marker chose to stop (Ctrl-Q, Ctrl-C): answers so far are kept.
+    try:
+        for i, submission in enumerate(todo):
+            name = os.path.basename(os.path.abspath(submission))
+            _mark(submission, arb_path, output, also, root, fresh, choose, batch)
+            progress.finished(name)
+            if i + 1 < len(todo):
+                upcoming = os.path.basename(os.path.abspath(todo[i + 1]))
+                if not _confirm_next(chosen, name, upcoming, progress):
+                    raise KeyboardInterrupt
+    except KeyboardInterrupt:
+        click.echo("Stopped. Answers so far are saved; run again to resume.",
+                   err=True)
+        sys.exit(1)
 
 
 def _confirm_next(chosen, finished, upcoming, progress):

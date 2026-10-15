@@ -144,7 +144,7 @@ class Splitter(Widget):
         self.target.styles.width = width
 
 
-class QuestionApp(App):
+class QuestionApp(App, inherit_bindings=False):
     CSS = """
     #header { background: $boost; padding: 0 1; }
     #body { height: 1fr; }
@@ -155,15 +155,18 @@ class QuestionApp(App):
     #entry { height: auto; }
     """
     BINDINGS = [
+        ## Footer order follows this order. Textual's own bindings are not
+        ## inherited: its Ctrl-Q would otherwise keep its early place.
+        ## Priority, so the tab keys work from the entry boxes (where they
+        ## would otherwise move by word).
+        Binding("ctrl+left", "tab(-1)", "Previous tab", priority=True),
+        Binding("ctrl+right", "tab(1)", "Next tab", priority=True),
         Binding("ctrl+o", "open_file", "Open in viewer"),
         Binding("ctrl+x", "close_file", "Close in viewer"),
         Binding("ctrl+t", "terminal", "Terminal"),
         Binding("ctrl+r", "restart", "Restart marking"),
         Binding("ctrl+q", "quit", "Quit", priority=True),
-        ## Priority, so they work from the entry boxes (where they would
-        ## otherwise move by word).
-        Binding("ctrl+right", "tab(1)", "Next tab", show=False, priority=True),
-        Binding("ctrl+left", "tab(-1)", "Previous tab", show=False, priority=True),
+        Binding("ctrl+c", "help_quit", show=False, system=True),
         ## Textual's own command palette, relabelled; declaring it here
         ## stops Textual adding its default, labelled "palette".
         Binding(
