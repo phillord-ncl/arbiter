@@ -21,7 +21,7 @@ from .core import UNDECIDED_NOTE, RestartMarking, Result
 from .dump import FILENAME, FORMATS, Dumper, load_previous
 from .scripts import ScriptClash
 from .toml_exercise import ArbTomlError, load_exercise
-from .unpack import UnpackError, unpack
+from .unpack import UnpackError, gather_canvas, unpack
 
 
 def _load_arb(path):
@@ -394,6 +394,16 @@ def _mark(submission, arb_path, output, also, root, fresh, choose, batch):
          "submissions.",
 )
 @click.option(
+    "--canvas",
+    "canvas_out",
+    default=None,
+    type=click.Path(file_okay=False),
+    help="The single argument is a Canvas bulk download, the "
+         "submissions.zip or its unpacked directory (files named "
+         "NAME_USERID_SUBMISSIONID_FILE). Make one directory "
+         "per student in this directory, then unpack each.",
+)
+@click.option(
     "--into",
     default="project",
     show_default=True,
@@ -405,7 +415,7 @@ def _mark(submission, arb_path, output, also, root, fresh, choose, batch):
     help="Replace the directory if it already exists (by default it is "
          "left alone).",
 )
-def unpack_cmd(submissions, recursive, into, force):
+def unpack_cmd(submissions, recursive, canvas_out, into, force):
     """Make a project directory in each SUBMISSION from the files the
     student uploaded.
 
@@ -413,7 +423,16 @@ def unpack_cmd(submissions, recursive, into, force):
     files loose at the top, or directories nested pointlessly; a submission
     of plain files has them copied. The originals are kept."""
     failed = 0
-    for submission in _expand(submissions, recursive):
+    if canvas_out is not None:
+        if len(submissions) != 1 or recursive:
+            raise click.UsageError("--canvas takes one download directory")
+        try:
+            found = gather_canvas(submissions[0], canvas_out)
+        except UnpackError as e:
+            raise click.ClickException(str(e))
+    else:
+        found = _expand(submissions, recursive)
+    for submission in found:
         name = os.path.basename(os.path.abspath(submission))
         try:
             click.echo("{}: {}".format(name, unpack(submission, into, force)))

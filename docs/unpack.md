@@ -18,4 +18,18 @@ student uploaded, and leaves the originals beside it.
   unreadable archive is reported for that submission and the rest carry on;
   the exit status is then non-zero.
 
+## Straight from Canvas
+
+    arbiter unpack --canvas OUT submissions.zip
+
+Canvas's bulk download is a `submissions.zip` of files named
+`NAME_[LATE_]USERID_SUBMISSIONID_FILE`. With `--canvas OUT` (the argument may
+also be the already-unpacked directory) arbiter makes `OUT/NAME_USERID/` for
+each student holding their files, a small `canvas.toml` (user id, submission
+ids, late or not, original file names), and then the `project/` as above. The
+download itself is not touched, and no API key is needed. A file not named
+this way stops it, rather than being guessed at.
+
+Then mark with `arbiter -r OUT`.
+
 `--into NAME` makes a different directory name.

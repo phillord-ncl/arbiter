@@ -93,3 +93,45 @@ def test_command_goes_on_after_a_bad_submission(tmp_path):
     result = CliRunner().invoke(unpack_cmd, ["-r", str(tmp_path)])
     assert result.exit_code != 0
     assert (tmp_path / "c02" / "project" / "a.py").exists()
+
+
+def test_canvas_download_is_gathered_per_student(tmp_path):
+    down, out = tmp_path / "down", tmp_path / "out"
+    down.mkdir()
+    make_zip(down / "smithjo_1_10_my project.zip", ["a.py"])
+    make_zip(down / "doeana_LATE_2_20_p.zip", ["d/a.py"])
+    (down / "doeana_2_21_notes.txt").write_text("hi")
+    result = CliRunner().invoke(unpack_cmd, ["--canvas", str(out), str(down)])
+    assert result.exit_code != 0  # doeana has an archive and a loose file
+    assert (out / "smithjo_1" / "project" / "a.py").exists()
+    assert (out / "smithjo_1" / "my project.zip").exists()
+    meta = (out / "doeana_2" / "canvas.toml").read_text()
+    assert "late = true" in meta and 'user_id = 2' in meta
+    assert sorted(os.listdir(down)) == sorted(
+        ["smithjo_1_10_my project.zip", "doeana_LATE_2_20_p.zip",
+         "doeana_2_21_notes.txt"]
+    )
+
+
+def test_canvas_refuses_oddly_named_files(tmp_path):
+    (tmp_path / "down").mkdir()
+    (tmp_path / "down" / "mystery.zip").write_text("")
+    result = CliRunner().invoke(
+        unpack_cmd, ["--canvas", str(tmp_path / "out"), str(tmp_path / "down")]
+    )
+    assert result.exit_code != 0 and "not named like" in result.output
+
+
+def test_canvas_submissions_zip_is_read_directly(tmp_path):
+    inner = tmp_path / "in"
+    inner.mkdir()
+    make_zip(inner / "smithjo_1_10_p.zip", ["a.py"])
+    with zipfile.ZipFile(tmp_path / "submissions.zip", "w") as z:
+        z.write(inner / "smithjo_1_10_p.zip", "smithjo_1_10_p.zip")
+    out = tmp_path / "out"
+    result = CliRunner().invoke(
+        unpack_cmd, ["--canvas", str(out), str(tmp_path / "submissions.zip")]
+    )
+    assert result.exit_code == 0, result.output
+    assert (out / "smithjo_1" / "project" / "a.py").exists()
+    assert sorted(os.listdir(out)) == ["smithjo_1"]

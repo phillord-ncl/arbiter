@@ -9,6 +9,7 @@ leaves the same shape, ``DIR/project/``, and keeps the originals beside it.
 """
 
 import os
+import re
 import shutil
 import tarfile
 import zipfile
@@ -17,7 +18,7 @@ import zipfile
 JUNK = {"__MACOSX", ".DS_Store", "Thumbs.db"}
 
 #: Files in a submission directory that are ours, not the student's.
-OWN_FILES = ("arb-results", "tent-peg.toml")
+OWN_FILES = ("arb-results", "tent-peg.toml", "canvas.toml")
 
 ARCHIVE_SUFFIXES = (".zip", ".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tar.xz")
 
@@ -141,3 +142,56 @@ def unpack(submission, into="project", force=False):
     finally:
         shutil.rmtree(work, ignore_errors=True)
     return how
+
+
+#: Canvas's bulk download names a file NAME_[LATE_]USERID_SUBMISSIONID_ORIGINAL
+CANVAS_NAME = re.compile(
+    r"^(?P<name>[^_]+)_(?P<late>LATE_)?(?P<user>\d+)_(?P<submission>\d+)_(?P<original>.+)$"
+)
+
+
+def gather_canvas(download, out):
+    """``download`` is the directory, or the submissions.zip Canvas hands
+    over, of a bulk download. The files in it are copied into one directory per
+    student under ``out``, named NAME_USERID, with a ``canvas.toml`` noting
+    the ids, which files and whether any was late. Returns the directories
+    made. The download is left untouched; a file not named the Canvas way
+    raises UnpackError rather than being guessed at."""
+    if os.path.isfile(download):
+        scratch = os.path.join(out, ".canvas-tmp")
+        shutil.rmtree(scratch, ignore_errors=True)
+        os.makedirs(scratch)
+        try:
+            _extract(download, scratch)
+            return gather_canvas(scratch, out)
+        finally:
+            shutil.rmtree(scratch, ignore_errors=True)
+    students = {}
+    for name in sorted(os.listdir(download)):
+        path = os.path.join(download, name)
+        if not os.path.isfile(path) or name.startswith("."):
+            continue
+        m = CANVAS_NAME.match(name)
+        if m is None:
+            raise UnpackError("{} is not named like a Canvas download".format(name))
+        students.setdefault((m["name"], m["user"]), []).append((m, path))
+    if not students:
+        raise UnpackError("no files in {}".format(download))
+
+    made = []
+    for (name, user), files in sorted(students.items()):
+        directory = os.path.join(out, "{}_{}".format(name, user))
+        os.makedirs(directory, exist_ok=True)
+        for m, path in files:
+            shutil.copy2(path, os.path.join(directory, m["original"]))
+        with open(os.path.join(directory, "canvas.toml"), "w") as f:
+            f.write("user_id = {}\n".format(user))
+            f.write("submission_ids = [{}]\n".format(
+                ", ".join(sorted({m["submission"] for m, _ in files}))))
+            f.write("late = {}\n".format(
+                "true" if any(m["late"] for m, _ in files) else "false"))
+            f.write("files = [{}]\n".format(
+                ", ".join('"{}"'.format(m["original"].replace('"', "'"))
+                          for m, _ in files)))
+        made.append(directory)
+    return made
