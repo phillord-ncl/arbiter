@@ -7,10 +7,12 @@ instead, so an arb.py only ever defines the Exercise itself. An arb.toml
 (see toml_exercise.py) does the same declaratively.
 """
 
+import collections
 import importlib.util
 import glob
 import os
 import sys
+import tomllib
 
 import click
 
@@ -73,7 +75,55 @@ def _default_ask_interactively(question):
     return Result(out_of=question.out_of, score=score, feedback="marker-entered")
 
 
-def _choose_ask(tui):
+class Progress:
+    """How far through a batch of submissions we are, for the TUI's panel."""
+
+    LOG_LINES = 2
+
+    def __init__(self, total):
+        self.total = total
+        self.done = 0
+        self.log = collections.deque(maxlen=self.LOG_LINES)
+
+    def note(self, line):
+        self.log.append(line)
+
+    def finished(self, name):
+        self.done += 1
+        self.note("{}: marked".format(name))
+
+    def skipped(self, name):
+        self.done += 1
+        self.note("{}: already complete, skipped".format(name))
+
+
+def _is_complete(submission):
+    """True if the submission's results file says marking finished."""
+    try:
+        with open(os.path.join(submission, FILENAME + ".toml"), "rb") as f:
+            return bool(tomllib.load(f).get("complete"))
+    except (OSError, ValueError):
+        return False
+
+
+def _expand(paths, recursive):
+    """The submissions named by ``paths``; with ``recursive`` each path is a
+    directory whose (non-hidden) subdirectories are the submissions."""
+    if not recursive:
+        return [_find_submission(p) for p in paths]
+    found = []
+    for path in paths:
+        if not os.path.isdir(path):
+            raise click.UsageError("{} is not a directory".format(path))
+        found += [
+            os.path.join(path, d)
+            for d in sorted(os.listdir(path))
+            if not d.startswith(".") and os.path.isdir(os.path.join(path, d))
+        ]
+    return found
+
+
+def _choose_ask(tui, progress=None):
     """The hook to answer questions with: the TUI if asked for, or if it is
     installed and we are in a terminal; otherwise plain prompts."""
     if tui is None:
@@ -98,7 +148,7 @@ def _choose_ask(tui):
             terminal = load_terminal()
         except ConfigError as e:
             raise click.ClickException(str(e))
-        return make_ask_interactively(viewer, terminal)
+        return make_ask_interactively(viewer, terminal, progress)
     return _default_ask_interactively
 
 
@@ -139,8 +189,19 @@ def _find_submission(name):
     return name
 
 
-@click.command(help="Run an arb.py or arb.toml's Exercise against one submission.")
-@click.argument("submission")  # a directory, or a unique NAME@... / NAME...
+@click.command(
+    help="Run an arb.py or arb.toml's Exercise against each SUBMISSION. With "
+    "-r, each SUBMISSION is a directory of submissions instead."
+)
+@click.argument("submissions", nargs=-1, required=True)  # a directory, or a unique NAME@... / NAME...
+@click.option(
+    "-r",
+    "--recursive",
+    is_flag=True,
+    help="Each argument is a directory whose subdirectories are the "
+         "submissions. Submissions already marked complete are skipped "
+         "(unless --fresh).",
+)
 @click.option(
     "--arb",
     "arb_path",
@@ -186,24 +247,73 @@ def _find_submission(name):
     help="Answer questions in the terminal UI (needs the tui extra). "
          "Default: use it if installed and running in a terminal.",
 )
-def cli(submission, arb_path, output, also, root, fresh, tui):
-    submission = _find_submission(submission)
+def cli(submissions, recursive, arb_path, output, also, root, fresh, tui):
     arb_path = arb_path or _find_arb()
+    found = _expand(submissions, recursive)
+    if not found:
+        raise click.ClickException("no submissions found")
+    if output is not None and len(found) > 1:
+        raise click.UsageError("--output needs exactly one submission")
+    ## One submission named outright is marked again whatever its state;
+    ## among several, the complete ones are skipped.
+    batch = len(found) > 1 or recursive
+    progress = Progress(len(found))
+    chosen = []
+
+    def choose():
+        if not chosen:
+            chosen.append(_choose_ask(tui, progress))
+        return chosen[0]
+
+    todo = []
+    for submission in found:
+        name = os.path.basename(os.path.abspath(submission))
+        if batch and not fresh and _is_complete(submission):
+            progress.skipped(name)
+            click.echo("{}: already complete, skipped".format(name), err=True)
+        else:
+            todo.append(submission)
+
+    for i, submission in enumerate(todo):
+        name = os.path.basename(os.path.abspath(submission))
+        _mark(submission, arb_path, output, also, root, fresh, choose, batch)
+        progress.finished(name)
+        if i + 1 < len(todo):
+            upcoming = os.path.basename(os.path.abspath(todo[i + 1]))
+            if not _confirm_next(chosen, name, upcoming, progress):
+                raise click.Abort()
+
+
+def _confirm_next(chosen, finished, upcoming, progress):
+    """Pause between students so the marker can close the last one's
+    terminals and viewer files. True to carry on."""
+    hook = getattr(chosen[0], "next_student", None) if chosen else None
+    if hook is not None:
+        return hook(finished, upcoming, progress)
+    if sys.stdin.isatty() and sys.stdout.isatty():
+        return click.confirm(
+            "{} done. Close their terminals and files. Next student, {}?".format(
+                finished, upcoming
+            ),
+            default=True,
+        )
+    return True
+
+
+def _mark(submission, arb_path, output, also, root, fresh, choose, batch):
     if arb_path.endswith(".toml"):
         try:
             exercise, rubric_toml = load_exercise(arb_path, submission, root)
         except ArbTomlError as e:
             raise click.ClickException("{}: {}".format(arb_path, e))
-        ask_interactively = _choose_ask(tui)
+        ask_interactively = choose()
     else:
         module = _load_arb(arb_path)
         project_dir = os.path.join(submission, root) if root else submission
         exercise = module.build(project_dir)
         exercise.directory = project_dir
         rubric_toml = getattr(module, "RUBRIC_TOML", None)
-        ask_interactively = getattr(module, "ask_interactively", None) or _choose_ask(
-            tui
-        )
+        ask_interactively = getattr(module, "ask_interactively", None) or choose()
 
     if rubric_toml is not None:
         problems = exercise.check_consistent_with_rubric_toml(rubric_toml)
@@ -238,17 +348,24 @@ def cli(submission, arb_path, output, also, root, fresh, tui):
         exercise.prepare(project)
     except ScriptClash as e:
         raise click.ClickException(str(e))
+    label = os.path.basename(os.path.abspath(submission))
     # Write after every human answer, not just at the end, so a crash
     # mid-marking keeps what was already entered.
     exercise.run(
         ask_interactively=ask_interactively,
         checkpoint=dumper.write,
-        label=os.path.basename(os.path.abspath(submission)),
+        label=label,
         directory=os.path.abspath(project),
         previous=None if fresh else previous,
     )
     dumper.write(exercise, complete=True)
 
+    if batch:
+        click.echo(
+            "{}: {}/{}".format(label, exercise.score(), exercise.max_score()),
+            err=True,
+        )
+        return
     for marker in exercise.markers:
         for result in marker.results:
             click.echo(

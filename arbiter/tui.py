@@ -9,7 +9,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from rich.text import Text
 from textual import events
-from textual.containers import Horizontal, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widget import Widget
 from textual.widgets import Footer, Input, Label, Static, TabbedContent, TabPane
 
@@ -61,6 +61,17 @@ def _marked_text(question):
             who, criterion or "(none)", result.feedback
         ))
     return text
+
+
+def _progress_text(progress):
+    """Done and to go, then the last couple of log lines."""
+    lines = [
+        "{} done, {} to go (of {})".format(
+            progress.done, progress.total - progress.done, progress.total
+        )
+    ]
+    lines.extend(progress.log)
+    return "\n".join(lines)
 
 
 def _question_text(question):
@@ -138,7 +149,9 @@ class QuestionApp(App):
     #header { background: $boost; padding: 0 1; }
     #body { height: 1fr; }
     #context { width: 2fr; }
-    #marked { width: 1fr; min-width: 12; border: round $primary; border-title-align: left; padding: 0 1; }
+    #side { width: 1fr; min-width: 12; }
+    #marked { height: 1fr; border: round $primary; border-title-align: left; padding: 0 1; }
+    #progress { height: auto; border: round $primary; padding: 0 1; }
     #entry { height: auto; }
     """
     BINDINGS = [
@@ -163,9 +176,11 @@ class QuestionApp(App):
         ),
     ]
 
-    def __init__(self, question, viewer=None, terminal=None):
+    def __init__(self, question, viewer=None, terminal=None, progress=None):
         super().__init__()
         self.question = question
+        ## A cli.Progress when marking a batch, else None.
+        self.progress = progress
         self.viewer = viewer
         ## The configured ``[terminal] open`` command line, or None for a
         ## platform default.
@@ -189,10 +204,15 @@ class QuestionApp(App):
                     with TabPane(item.title, id="item{}".format(i)):
                         with VerticalScroll():
                             yield Static(_item_text(item), markup=False)
-            marked = VerticalScroll(id="marked")
-            yield Splitter(marked, id="splitter")
-            with marked:
-                yield Static(_marked_text(self.question), markup=False)
+            side = Vertical(id="side")
+            yield Splitter(side, id="splitter")
+            with side:
+                with VerticalScroll(id="marked"):
+                    yield Static(_marked_text(self.question), markup=False)
+                if self.progress is not None and self.progress.total > 1:
+                    yield Static(
+                        _progress_text(self.progress), id="progress", markup=False
+                    )
         previous = self.question.previous
         yield Input(
             value=format(previous.score, "g") if previous else "",
@@ -282,12 +302,56 @@ class QuestionApp(App):
         self.exit()
 
 
-def make_ask_interactively(viewer=None, terminal=None):
+class NextStudentApp(App):
+    """Shown between students: the marker closes the last one's terminals and
+    viewer files, then says to go on. ``carry_on`` is None if they quit."""
+
+    CSS = """
+    Screen { align: center middle; }
+    #dialog { width: 70; height: auto; border: round $primary; padding: 1 2; }
+    """
+    BINDINGS = [
+        Binding("enter", "go", "Next student"),
+        Binding("ctrl+q", "quit", "Stop marking", priority=True),
+    ]
+
+    def __init__(self, finished, upcoming, progress=None):
+        super().__init__()
+        self.finished = finished
+        self.upcoming = upcoming
+        self.progress = progress
+        self.carry_on = None
+
+    def compose(self) -> ComposeResult:
+        lines = [
+            "{} is marked.".format(self.finished),
+            "",
+            "Close their terminals and files in the viewer, so that you are "
+            "not in the wrong place.",
+            "",
+            "Next student: {}".format(self.upcoming),
+        ]
+        if self.progress is not None:
+            lines += ["", _progress_text(self.progress)]
+        with Vertical(id="dialog"):
+            yield Static("\n".join(lines), markup=False)
+        yield Footer()
+
+    def action_go(self):
+        self.carry_on = True
+        self.exit()
+
+    def action_quit(self):
+        self.carry_on = False
+        self.exit()
+
+
+def make_ask_interactively(viewer=None, terminal=None, progress=None):
     """An ``ask_interactively`` hook that shows each question in a
     ``QuestionApp``. Quitting the app without answering stops marking."""
 
     def ask(question):
-        app = QuestionApp(question, viewer, terminal)
+        app = QuestionApp(question, viewer, terminal, progress)
         app.run()
         if app.restart:
             raise RestartMarking()
@@ -295,4 +359,10 @@ def make_ask_interactively(viewer=None, terminal=None):
             raise KeyboardInterrupt("question not answered")
         return app.result
 
+    def next_student(finished, upcoming, progress=None):
+        app = NextStudentApp(finished, upcoming, progress)
+        app.run()
+        return bool(app.carry_on)
+
+    ask.next_student = next_student
     return ask

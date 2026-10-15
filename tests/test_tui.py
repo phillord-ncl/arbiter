@@ -241,3 +241,31 @@ def test_ctrl_arrows_move_between_tabs_and_wrap(tmp_path):
     assert after("ctrl+right", "ctrl+right") == "item1"
     assert after("ctrl+right", "ctrl+right", "ctrl+right") == "question"
     assert after("ctrl+left") == "item1"
+
+
+def test_progress_panel_shows_only_for_a_batch(tmp_path):
+    from arbiter.cli import Progress
+
+    async def panel(progress):
+        app = QuestionApp(_question(tmp_path), progress=progress)
+        async with app.run_test() as pilot:
+            return len(app.query("#progress"))
+
+    batch = Progress(3)
+    batch.skipped("c01")
+    assert asyncio.run(panel(batch)) == 1
+    assert asyncio.run(panel(Progress(1))) == 0
+    assert asyncio.run(panel(None)) == 0
+
+
+def test_next_student_dialog_continues_on_enter_and_stops_on_quit():
+    from arbiter.tui import NextStudentApp
+
+    async def run(key):
+        app = NextStudentApp("c01", "c02")
+        async with app.run_test() as pilot:
+            await pilot.press(key)
+        return app.carry_on
+
+    assert asyncio.run(run("enter")) is True
+    assert asyncio.run(run("ctrl+q")) is False

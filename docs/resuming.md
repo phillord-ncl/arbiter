@@ -25,3 +25,24 @@ terminal (Ctrl-T), then press Ctrl-R (or type `restart` at the plain prompt).
 Marking begins again as above: automatic checks re-run on the edited files and
 your answers so far are offered back, pre-filled. The number of restarts is
 recorded in the results file.
+
+## Marking a series
+
+Name several submissions, or use `-r` to name directories whose
+subdirectories are the submissions:
+
+    arbiter -r submissions
+    arbiter submissions/c01 submissions/c02     # or submissions/*
+
+When more than one submission is named (or with `-r`), any whose results file
+says `complete = true` is skipped, so rerunning carries on with the ones not
+finished. `--fresh` marks everyone again. A single submission named outright
+is always marked, complete or not. `--output` needs exactly one submission.
+
+In the TUI a small panel under "Marked so far" shows how many are done and
+to go, and the last two log lines (marked, or skipped as complete).
+
+Between students a "Next student" dialog reminds you to close the last
+student's terminals and viewer files. Enter carries on; Ctrl-Q stops (those
+already marked stay complete). Plain mode asks `Next student?` when run in a
+terminal.
