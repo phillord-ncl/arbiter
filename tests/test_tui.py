@@ -221,3 +221,23 @@ def test_ctrl_q_quits_without_an_answer(tmp_path):
 def test_quit_is_listed_in_the_footer(tmp_path):
     labels = asyncio.run(_footer_labels(QuestionApp(_question(tmp_path))))
     assert "Quit" in labels
+
+
+async def _tabs_after(app, keys):
+    async with app.run_test(size=(100, 30)) as pilot:
+        for key in keys:
+            await pilot.press(key)
+            await pilot.pause()
+        return app.query_one("#context").active
+
+
+def test_ctrl_arrows_move_between_tabs_and_wrap(tmp_path):
+    def after(*keys):
+        app = QuestionApp(_question(tmp_path))
+        return asyncio.run(_tabs_after(app, keys))
+
+    # Tabs: Question, stdout, s.py
+    assert after("ctrl+right") == "item0"
+    assert after("ctrl+right", "ctrl+right") == "item1"
+    assert after("ctrl+right", "ctrl+right", "ctrl+right") == "question"
+    assert after("ctrl+left") == "item1"

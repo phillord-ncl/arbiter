@@ -147,6 +147,10 @@ class QuestionApp(App):
         Binding("ctrl+t", "terminal", "Terminal"),
         Binding("ctrl+r", "restart", "Restart marking"),
         Binding("ctrl+q", "quit", "Quit", priority=True),
+        ## Priority, so they work from the entry boxes (where they would
+        ## otherwise move by word).
+        Binding("ctrl+right", "tab(1)", "Next tab", show=False, priority=True),
+        Binding("ctrl+left", "tab(-1)", "Previous tab", show=False, priority=True),
         ## Textual's own command palette, relabelled; declaring it here
         ## stops Textual adding its default, labelled "palette".
         Binding(
@@ -233,6 +237,13 @@ class QuestionApp(App):
         item = self._file_item()
         if self.viewer is not None and item is not None:
             self.viewer.close_file(item.path)
+
+    def action_tab(self, step: int):
+        """Move ``step`` tabs along (wrapping round)."""
+        context = self.query_one("#context", TabbedContent)
+        ids = [pane.id for pane in context.query(TabPane)]
+        if ids and context.active in ids:
+            context.active = ids[(ids.index(context.active) + step) % len(ids)]
 
     def action_restart(self):
         self.restart = True
