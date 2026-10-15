@@ -146,6 +146,7 @@ class QuestionApp(App):
         Binding("ctrl+x", "close_file", "Close in viewer"),
         Binding("ctrl+t", "terminal", "Terminal"),
         Binding("ctrl+r", "restart", "Restart marking"),
+        Binding("ctrl+q", "quit", "Quit", priority=True),
         ## Textual's own command palette, relabelled; declaring it here
         ## stops Textual adding its default, labelled "palette".
         Binding(

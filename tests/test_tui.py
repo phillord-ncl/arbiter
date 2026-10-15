@@ -204,3 +204,20 @@ def test_open_from_a_file_tab_opens_that_file(tmp_path):
     app = QuestionApp(_question(tmp_path), viewer=viewer)
     asyncio.run(_open_from(app, "item1"))
     assert viewer.opened == [str(tmp_path / "s.py")]
+
+
+def test_ctrl_q_quits_without_an_answer(tmp_path):
+    app = QuestionApp(_question(tmp_path))
+
+    async def run():
+        async with app.run_test() as pilot:
+            await pilot.press("ctrl+q")
+            await pilot.pause()
+
+    asyncio.run(run())
+    assert app.result is None and not app.restart
+
+
+def test_quit_is_listed_in_the_footer(tmp_path):
+    labels = asyncio.run(_footer_labels(QuestionApp(_question(tmp_path))))
+    assert "Quit" in labels
