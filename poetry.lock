@@ -684,7 +684,7 @@ optional = false
 python-versions = ">=3.14,<4.0"
 groups = ["main"]
 files = []
-develop = true
+develop = false
 
 [package.dependencies]
 appdirs = "^1.4.4"
@@ -698,8 +698,10 @@ stringcase = "^1.2.0"
 toml = "^0.10.1"
 
 [package.source]
-type = "directory"
-url = "../../tent-pole/main"
+type = "git"
+url = "https://github.com/phillord-ncl/tent-pole.git"
+reference = "v0.7.0"
+resolved_reference = "0ad6e30052d6974afd3d9541beb8abaea5f682d9"
 
 [[package]]
 name = "textual"
@@ -786,4 +788,4 @@ tui = ["textual"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.14,<4.0"
-content-hash = "bb5f9aa569b1782264ab3845d5fcee6ddc9d53ef98098da9ea8e6592e7f4d50b"
+content-hash = "663f9b92ffc32b59b3da995c6103344d1d2db3d3a3b5efbfbeac399675b7e96a"
