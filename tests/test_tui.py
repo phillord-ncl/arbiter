@@ -135,3 +135,17 @@ def test_command_palette_is_labelled_menu(tmp_path):
     labels = asyncio.run(_footer_labels(QuestionApp(_question(tmp_path))))
     assert "menu" in labels
     assert "palette" not in labels
+
+
+async def _splitter_text(app):
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        splitter = app.query_one("#splitter")
+        return "".join(
+            "".join(seg.text for seg in line)
+            for line in splitter.render_lines(splitter.size.region)
+        ).strip()
+
+
+def test_the_splitter_draws_no_text(tmp_path):
+    assert asyncio.run(_splitter_text(QuestionApp(_question(tmp_path)))) == ""

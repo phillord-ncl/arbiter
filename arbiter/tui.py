@@ -91,6 +91,10 @@ class Splitter(Widget):
         self.target = target
         self.dragging = False
 
+    def render(self):
+        ## A bare widget draws its own name.
+        return ""
+
     def on_mouse_down(self, event: events.MouseDown) -> None:
         self.dragging = True
         self.capture_mouse()
