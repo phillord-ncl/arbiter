@@ -25,7 +25,8 @@ close = "COMMAND {file}"     # optional
 
 - `open` is run when you press Ctrl-O on a file's tab.
 - `close` is run when you press Ctrl-X. It is optional; without it Ctrl-X
-  does nothing.
+  does nothing. When a student is finished, `close` is also run for every
+  file you opened and have not closed.
 - `{file}` is replaced by the file's full path.
 
 Each command is split into words first and `{file}` is substituted

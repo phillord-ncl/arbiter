@@ -329,8 +329,8 @@ class NextStudentApp(App):
         lines = [
             "{} is marked.".format(self.finished),
             "",
-            "Close their terminals and files in the viewer, so that you are "
-            "not in the wrong place.",
+            "Close their terminals, and any files the viewer could not close, "
+            "so that you are not in the wrong place.",
             "",
             "Next student: {}".format(self.upcoming),
         ]
@@ -367,5 +367,10 @@ def make_ask_interactively(viewer=None, terminal=None, progress=None):
         app.run()
         return bool(app.carry_on)
 
+    def student_done():
+        if viewer is not None:
+            viewer.close_all()
+
     ask.next_student = next_student
+    ask.student_done = student_done
     return ask

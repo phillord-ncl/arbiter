@@ -64,3 +64,21 @@ def test_default_viewer_is_vscode_on_windows_when_installed():
 def test_no_default_viewer_without_vscode_or_off_windows():
     assert default_viewer("win32", which=lambda name: None) is None
     assert default_viewer("linux", which=lambda name: "/usr/bin/code.cmd") is None
+
+
+def test_viewer_closes_everything_it_opened(tmp_path):
+    from arbiter.config import Viewer
+
+    log = tmp_path / "log"
+    viewer = Viewer(
+        "sh -c 'echo open {file} >> " + str(log) + "'",
+        "sh -c 'echo close {file} >> " + str(log) + "'",
+    )
+    viewer.open_file("a")
+    viewer.open_file("b")
+    viewer.close_file("a")
+    viewer.close_all()
+    assert log.read_text().split("\n")[:-1] == [
+        "open a", "open b", "close a", "close b"
+    ]
+    assert viewer.opened == []

@@ -24,7 +24,7 @@ import shutil
 import subprocess
 import sys
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 import click
@@ -49,6 +49,8 @@ class Viewer:
 
     open: str
     close: Optional[str] = None
+    ## Files opened and not yet closed, so a student's can be closed at the end.
+    opened: list = field(default_factory=list, repr=False, compare=False)
 
     def _run(self, template, path):
         args = [a.replace("{file}", path) for a in _command(template)]
@@ -56,10 +58,21 @@ class Viewer:
 
     def open_file(self, path):
         self._run(self.open, path)
+        if path not in self.opened:
+            self.opened.append(path)
 
     def close_file(self, path):
         if self.close is not None:
             self._run(self.close, path)
+        if path in self.opened:
+            self.opened.remove(path)
+
+    def close_all(self):
+        """Close every file opened since the last time (if there is a close
+        command)."""
+        for path in list(self.opened):
+            self.close_file(path)
+        self.opened.clear()
 
 
 def load_viewer(path=None):
