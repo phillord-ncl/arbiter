@@ -16,7 +16,7 @@ import tomllib
 
 import click
 
-from .config import ConfigError, load_terminal, load_viewer
+from .config import ConfigError, default_viewer, load_terminal, load_viewer
 from .core import UNDECIDED_NOTE, RestartMarking, Result
 from .dump import FILENAME, FORMATS, Dumper, load_previous
 from .scripts import ScriptClash
@@ -141,7 +141,7 @@ def _choose_ask(tui, progress=None):
                 )
             return _default_ask_interactively
         try:
-            viewer = load_viewer()
+            viewer = load_viewer() or default_viewer()
         except ConfigError as e:
             raise click.ClickException(str(e))
         try:

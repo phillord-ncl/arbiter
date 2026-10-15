@@ -7,8 +7,9 @@ says how to view a submission's files::
     open = "emacsclient -n {file}"
     close = "..."          # optional
 
-With no config (or no ``[viewer]``) there is no external viewer and the UI
-shows files itself. ``[terminal]`` says how to open a terminal in a
+With no config (or no ``[viewer]``) the viewer is VS Code on Windows if it
+is installed (see ``default_viewer``); otherwise there is no external viewer
+and the UI shows files itself. ``[terminal]`` says how to open a terminal in a
 submission::
 
     [terminal]
@@ -19,7 +20,9 @@ With none, a platform default is guessed (see terminal.py).
 
 import os
 import shlex
+import shutil
 import subprocess
+import sys
 import tomllib
 from dataclasses import dataclass
 from typing import Optional
@@ -75,6 +78,15 @@ def load_viewer(path=None):
     if "open" not in viewer:
         raise ConfigError("{}: [viewer] needs an 'open' command".format(path))
     return Viewer(viewer["open"], viewer.get("close"))
+
+
+def default_viewer(platform=None, which=shutil.which):
+    """The viewer to use when none is configured: VS Code on Windows, if
+    it is on the PATH. Elsewhere, or without it, None."""
+    platform = platform or sys.platform
+    if platform.startswith("win") and which("code.cmd"):
+        return Viewer("code.cmd --reuse-window {file}")
+    return None
 
 
 def load_terminal(path=None):

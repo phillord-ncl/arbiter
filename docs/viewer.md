@@ -33,8 +33,10 @@ afterwards, and nothing is run through a shell. So a path with spaces in it
 arrives as a single argument, but shell features (pipes, `~`, environment
 variables) do not work. Use full paths for programs not on your `PATH`.
 
-If you configure nothing, Ctrl-O and Ctrl-X just tell you no viewer is
-configured. The files are still shown in the UI.
+If you configure nothing, on Windows `arbiter` uses Visual Studio Code when
+`code.cmd` is on your `PATH`, as in the example below. Elsewhere, or without
+VS Code, Ctrl-O and Ctrl-X just tell you no viewer is configured. The files
+are still shown in the UI.
 
 A close command that fails is ignored, so a refused close looks like Ctrl-X
 doing nothing.
@@ -60,10 +62,11 @@ the buffer stays open.
 
 ```toml
 [viewer]
-open = "code --reuse-window {file}"
+open = "code --reuse-window {file}"      # code.cmd on Windows
 ```
 
-`--reuse-window` opens the file in the window you already have rather than
+On Windows the command is `code.cmd`, as no shell is involved to find it
+as `code`. `--reuse-window` opens the file in the window you already have rather than
 starting a new one. VS Code has no command line way to close a file, so
 there is no `close` line.
 

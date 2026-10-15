@@ -2,7 +2,7 @@ import sys
 
 import pytest
 
-from arbiter.config import ConfigError, Viewer, load_viewer
+from arbiter.config import ConfigError, Viewer, default_viewer, load_viewer
 
 
 def _write(tmp_path, text):
@@ -54,3 +54,13 @@ def test_open_substitutes_path_with_spaces(tmp_path):
 
 def test_close_without_command_does_nothing():
     Viewer("x {file}").close_file("f")
+
+
+def test_default_viewer_is_vscode_on_windows_when_installed():
+    viewer = default_viewer("win32", which=lambda name: "C:\\code.cmd")
+    assert viewer == Viewer("code.cmd --reuse-window {file}")
+
+
+def test_no_default_viewer_without_vscode_or_off_windows():
+    assert default_viewer("win32", which=lambda name: None) is None
+    assert default_viewer("linux", which=lambda name: "/usr/bin/code.cmd") is None
