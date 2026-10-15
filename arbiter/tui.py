@@ -7,7 +7,9 @@ question gets its own short-lived app rather than one app driving the run.
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
+from textual import events
 from textual.containers import Horizontal, VerticalScroll
+from textual.widget import Widget
 from textual.widgets import Footer, Input, Label, Static, TabbedContent, TabPane
 
 from .core import UNDECIDED_NOTE, RestartMarking, Result
@@ -72,12 +74,53 @@ def _item_text(item):
         return "(cannot read {}: {})".format(item.path, e)
 
 
+class Splitter(Widget):
+    """A bar between the context and the "Marked so far" pane; drag it
+    sideways to resize the marked pane."""
+
+    MIN_WIDTH = 12
+    MIN_CONTEXT = 20
+
+    DEFAULT_CSS = """
+    Splitter { width: 1; background: $primary 40%; }
+    Splitter:hover { background: $primary; }
+    """
+
+    def __init__(self, target, **kwargs):
+        super().__init__(**kwargs)
+        self.target = target
+        self.dragging = False
+
+    def on_mouse_down(self, event: events.MouseDown) -> None:
+        self.dragging = True
+        self.capture_mouse()
+        event.stop()
+
+    def on_mouse_move(self, event: events.MouseMove) -> None:
+        if self.dragging:
+            self.resize_to(event.screen_x)
+            event.stop()
+
+    def on_mouse_up(self, event: events.MouseUp) -> None:
+        if self.dragging:
+            self.dragging = False
+            self.release_mouse()
+            event.stop()
+
+    def resize_to(self, screen_x):
+        """Put the bar at column ``screen_x``; the target takes the rest."""
+        total = self.app.size.width
+        width = total - screen_x - 1
+        width = max(self.MIN_WIDTH, min(width, total - self.MIN_CONTEXT - 1))
+        self.target.styles.width = width
+
+
 class QuestionApp(App):
     CSS = """
     #header { background: $boost; padding: 0 1; }
     #body { height: 1fr; }
     #context { width: 2fr; }
-    #marked { width: 1fr; border: round $primary; border-title-align: left; padding: 0 1; }
+    #marked { width: 1fr; min-width: 12; border: round $primary; border-title-align: left; padding: 0 1; }
     #entry { height: auto; }
     """
     BINDINGS = [
@@ -113,7 +156,9 @@ class QuestionApp(App):
                     with TabPane(item.title, id="item{}".format(i)):
                         with VerticalScroll():
                             yield Static(_item_text(item), markup=False)
-            with VerticalScroll(id="marked"):
+            marked = VerticalScroll(id="marked")
+            yield Splitter(marked, id="splitter")
+            with marked:
                 yield Static(_marked_text(self.question), markup=False)
         previous = self.question.previous
         yield Input(

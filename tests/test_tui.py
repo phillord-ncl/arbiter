@@ -98,3 +98,26 @@ def test_question_tab_shows_task_and_assignment_tab(tmp_path):
             assert app.query_one(TabbedContent).get_tab("assignment")
 
     asyncio.run(go())
+
+
+async def _drag_splitter(app, dx):
+    async with app.run_test(size=(100, 30)) as pilot:
+        marked = app.query_one("#marked")
+        before = marked.outer_size.width
+        await pilot.mouse_down("#splitter")
+        await pilot.hover("#splitter", offset=(dx, 0))
+        await pilot.mouse_up("#splitter")
+        await pilot.pause()
+        return before, marked.outer_size.width
+
+
+def test_dragging_the_splitter_resizes_the_marked_pane(tmp_path):
+    app = QuestionApp(_question(tmp_path))
+    before, after = asyncio.run(_drag_splitter(app, -15))
+    assert after > before
+
+
+def test_marked_pane_keeps_a_minimum_width(tmp_path):
+    app = QuestionApp(_question(tmp_path))
+    before, after = asyncio.run(_drag_splitter(app, 25))
+    assert after >= 12
