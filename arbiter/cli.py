@@ -188,6 +188,11 @@ def cli(submission, arb_path, output, also, root, fresh, tui):
     if output is not None:
         base = output[: -len(".toml")] if output.endswith(".toml") else output
     project = exercise.directory or submission
+    if not os.path.isdir(project):
+        raise click.ClickException(
+            "no project directory {} (is {} one submission, and is the "
+            "root right? see --root)".format(project, submission)
+        )
     dumper = Dumper(base, submission, rubric_toml, also)
     try:
         previous = load_previous(base + ".toml")

@@ -108,3 +108,20 @@ def test_tui_flag_builds_the_textual_hook():
     from arbiter.cli import _choose_ask, _default_ask_interactively
 
     assert _choose_ask(True) is not _default_ask_interactively
+
+
+def test_cli_reports_a_missing_project_directory(tmp_path):
+    (tmp_path / "arb.toml").write_text(
+        'root = "project"\n'
+        '[[marker]]\ncriterion = "c"\ntitle = "t"\n'
+        '[[marker.step]]\ntype = "file_exists"\nfiles = "a"\nout_of = 1\n'
+    )
+    sub = tmp_path / "sub"
+    sub.mkdir()
+
+    result = CliRunner().invoke(
+        cli, ["--arb", str(tmp_path / "arb.toml"), str(sub)]
+    )
+
+    assert result.exit_code != 0
+    assert "no project directory" in result.output
