@@ -94,11 +94,30 @@ class Question:
     ## run, if anything, for a UI to show and pre-fill. Only set if it is
     ## still an acceptable answer.
     previous: Optional[Result] = None
+    ## Feedback to offer when the marker gives full marks (None: none).
+    full_feedback: Optional[str] = None
+    ## Whether the marker must write feedback unless they give full marks.
+    require_feedback: bool = False
 
     def accepts(self, score):
         if self.choices is not None:
             return score in self.choices
         return 0 <= score <= self.out_of
+
+    def is_full(self, score):
+        return score == self.out_of
+
+    def feedback_problem(self, score, feedback):
+        """Why ``feedback`` is not enough for ``score``, else None."""
+        if self.require_feedback and not feedback and not self.is_full(score):
+            return "Feedback is required unless the score is full marks"
+        return None
+
+    def default_feedback(self, score):
+        """The feedback to use when the marker wrote none."""
+        if self.is_full(score) and self.full_feedback:
+            return self.full_feedback
+        return "marker-entered"
 
     def allowed(self):
         """What may be entered, as text for a prompt."""
@@ -466,12 +485,18 @@ class RunMarker(DirectoryMarker):
             ),
         )
 
-    def ask_for_score(self, question, out_of, choices=None):
+    def ask_for_score(
+        self, question, out_of, choices=None, full_feedback=None,
+        require_feedback=False,
+    ):
         """``question`` may be a plain string, or a callable taking the
         Marker's own RunContext -- e.g. to quote the script's own stdout
         back in the question text. Either way it is not actually called
         until the second pass. ``choices``, if given, are the only scores
         the marker may enter, in place of any number up to ``out_of``.
+        ``full_feedback`` is the feedback offered when the marker gives full
+        marks and has written none; ``require_feedback`` makes the marker
+        write some for any other score.
         """
 
         after_or_else = self._next_is_fallback
@@ -494,6 +519,8 @@ class RunMarker(DirectoryMarker):
                 context,
                 undecided=after_or_else,
                 choices=list(choices) if choices is not None else None,
+                full_feedback=full_feedback,
+                require_feedback=require_feedback,
             )
 
         return self._step(False, action, out_of=out_of)

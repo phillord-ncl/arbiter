@@ -52,6 +52,28 @@ question = "Is the report in another place or length?"
 out_of = 1
 ```
 
+## Feedback for human-marked questions
+
+An `ask_for_score` step may set two optional keys (or the same arguments to
+`ask_for_score()` in an `arb.py`):
+
+```toml
+[[marker.step]]
+type = "ask_for_score"
+question = "Does it work?"
+out_of = 3
+full_feedback = "Correct"       # offered for full marks
+require_feedback = true         # needed for any other score
+```
+
+With `full_feedback`, moving from the score box to the feedback box (Enter
+or Tab) after entering full marks fills the empty feedback box with that
+text, which the marker may edit or clear. With `require_feedback`, the
+marker cannot record a score below full marks without writing feedback.
+The plain prompt asks for feedback only when either key is set. Questions
+marked automatically keep the feedback of the check or match that decided
+them.
+
 ## Showing the marker things
 
 Some lines need a person to read something. These steps score nothing and

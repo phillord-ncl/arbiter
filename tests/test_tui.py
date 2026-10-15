@@ -269,3 +269,61 @@ def test_next_student_dialog_continues_on_enter_and_stops_on_quit():
 
     assert asyncio.run(run("enter")) is True
     assert asyncio.run(run("ctrl+q")) is False
+
+
+def test_full_marks_fill_the_feedback_box(tmp_path):
+    question = _question(tmp_path)
+    question.full_feedback = "Correct"
+    app = QuestionApp(question)
+    asyncio.run(_answer(app, "5", ""))
+    assert (app.result.score, app.result.feedback) == (5.0, "Correct")
+
+
+def test_full_marks_default_keeps_what_marker_typed(tmp_path):
+    question = _question(tmp_path)
+    question.full_feedback = "Correct"
+    app = QuestionApp(question)
+
+    async def go():
+        async with app.run_test() as pilot:
+            app.query_one("#feedback").value = "lovely"
+            await pilot.press("5", "enter", "enter")
+
+    asyncio.run(go())
+    assert app.result.feedback == "lovely"
+
+
+def test_required_feedback_is_enforced_below_full_marks(tmp_path):
+    question = _question(tmp_path)
+    question.require_feedback = True
+    app = QuestionApp(question)
+
+    async def go():
+        async with app.run_test() as pilot:
+            await pilot.press("3", "enter", "enter")
+            assert app.result is None
+            await pilot.press(*"why", "enter")
+
+    asyncio.run(go())
+    assert (app.result.score, app.result.feedback) == (3.0, "why")
+
+
+def test_required_feedback_not_needed_for_full_marks(tmp_path):
+    question = _question(tmp_path)
+    question.require_feedback = True
+    app = QuestionApp(question)
+    asyncio.run(_answer(app, "5", ""))
+    assert app.result.score == 5.0
+
+
+def test_tab_to_feedback_shows_the_full_marks_text(tmp_path):
+    question = _question(tmp_path)
+    question.full_feedback = "Correct"
+    app = QuestionApp(question)
+
+    async def go():
+        async with app.run_test() as pilot:
+            await pilot.press("5", "tab")
+            assert app.query_one("#feedback").value == "Correct"
+
+    asyncio.run(go())

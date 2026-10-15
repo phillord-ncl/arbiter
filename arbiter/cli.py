@@ -70,10 +70,20 @@ def _default_ask_interactively(question):
             score = float(answer) if answer.strip() else 0.0
         except ValueError:
             score = None
-        if score is not None and question.accepts(score):
-            break
-        click.echo("Please enter {}.".format(question.allowed()))
-    return Result(out_of=question.out_of, score=score, feedback="marker-entered")
+        if score is None or not question.accepts(score):
+            click.echo("Please enter {}.".format(question.allowed()))
+            continue
+        feedback = ""
+        if question.full_feedback and question.is_full(score):
+            feedback = input("Feedback [{}]: ".format(question.full_feedback)).strip()
+        elif question.require_feedback and not question.is_full(score):
+            while not feedback:
+                feedback = input("Feedback (required): ").strip()
+        return Result(
+            out_of=question.out_of,
+            score=score,
+            feedback=feedback or question.default_feedback(score),
+        )
 
 
 class Progress:

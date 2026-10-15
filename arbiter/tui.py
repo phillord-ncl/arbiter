@@ -282,6 +282,22 @@ class QuestionApp(App, inherit_bindings=False):
         except TerminalError as e:
             self.notify(str(e), severity="error")
 
+    def on_descendant_focus(self, event):
+        """Offer the full-marks feedback as soon as the marker moves to the
+        feedback box (Enter or Tab), so they can see and edit it."""
+        feedback = self.query_one("#feedback")
+        if event.widget is not feedback or feedback.value.strip():
+            return
+        if not self.question.full_feedback:
+            return
+        try:
+            full = self.question.is_full(float(self.query_one("#score").value))
+        except ValueError:
+            return
+        if full:
+            feedback.value = self.question.full_feedback
+            feedback.cursor_position = len(feedback.value)
+
     def on_input_submitted(self, event):
         if event.input.id == "score":
             self.query_one("#feedback").focus()
@@ -298,7 +314,13 @@ class QuestionApp(App, inherit_bindings=False):
             )
             self.query_one("#score").focus()
             return
-        feedback = self.query_one("#feedback").value.strip() or "marker-entered"
+        feedback = self.query_one("#feedback").value.strip()
+        problem = self.question.feedback_problem(score, feedback)
+        if problem:
+            self.notify(problem, severity="error")
+            self.query_one("#feedback").focus()
+            return
+        feedback = feedback or self.question.default_feedback(score)
         self.result = Result(
             out_of=self.question.out_of, score=score, feedback=feedback
         )

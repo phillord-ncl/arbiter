@@ -51,6 +51,9 @@ submission before marking.
     choices = [0, 5, 10]                 # optional: the only scores allowed
                                          # (negative ones make a deduction,
                                          # with out_of = 0)
+    full_feedback = "Correct"            # optional: offered for full marks
+    require_feedback = true              # optional: feedback needed unless
+                                         # full marks
 
 Mechanical checks (see arbiter.checks) score full marks when they pass and
 are otherwise undecided, so ``or_else = true`` on a following step lets a
@@ -175,7 +178,11 @@ def _add_step(marker, spec, where, directory):
             CHECKS[kind](marker, spec)
         elif kind == "ask_for_score":
             marker.ask_for_score(
-                _question(spec, directory), spec["out_of"], spec.get("choices")
+                _question(spec, directory),
+                spec["out_of"],
+                spec.get("choices"),
+                full_feedback=spec.get("full_feedback"),
+                require_feedback=spec.get("require_feedback", False),
             )
         else:
             raise ArbTomlError(
