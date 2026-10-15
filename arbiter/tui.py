@@ -367,9 +367,9 @@ def make_ask_interactively(viewer=None, terminal=None, progress=None):
         app.run()
         return bool(app.carry_on)
 
-    def student_done():
+    def student_done(submission):
         if viewer is not None:
-            viewer.close_all()
+            viewer.close_all(submission)
 
     ask.next_student = next_student
     ask.student_done = student_done

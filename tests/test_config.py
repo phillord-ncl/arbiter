@@ -82,3 +82,18 @@ def test_viewer_closes_everything_it_opened(tmp_path):
         "open a", "open b", "close a", "close b"
     ]
     assert viewer.opened == []
+
+
+def test_close_dir_is_used_for_everything_under_the_directory(tmp_path):
+    from arbiter.config import Viewer
+
+    log = tmp_path / "log"
+    viewer = Viewer(
+        "true {file}",
+        "sh -c 'echo close {file} >> " + str(log) + "'",
+        "sh -c 'echo dir {dir} >> " + str(log) + "'",
+    )
+    viewer.open_file("a")
+    viewer.close_all(str(tmp_path / "s 1"))
+    assert log.read_text() == "dir {}\n".format(tmp_path / "s 1")
+    assert viewer.opened == []

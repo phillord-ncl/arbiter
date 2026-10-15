@@ -6,6 +6,7 @@ says how to view a submission's files::
     [viewer]
     open = "emacsclient -n {file}"
     close = "..."          # optional
+    close_dir = "..."      # optional: close everything under {dir}
 
 With no config (or no ``[viewer]``) the viewer is VS Code on Windows if it
 is installed (see ``default_viewer``); otherwise there is no external viewer
@@ -49,11 +50,12 @@ class Viewer:
 
     open: str
     close: Optional[str] = None
+    close_dir: Optional[str] = None
     ## Files opened and not yet closed, so a student's can be closed at the end.
     opened: list = field(default_factory=list, repr=False, compare=False)
 
-    def _run(self, template, path):
-        args = [a.replace("{file}", path) for a in _command(template)]
+    def _run(self, template, path, key="{file}"):
+        args = [a.replace(key, path) for a in _command(template)]
         subprocess.run(args, check=False, stdout=subprocess.DEVNULL)
 
     def open_file(self, path):
@@ -67,9 +69,15 @@ class Viewer:
         if path in self.opened:
             self.opened.remove(path)
 
-    def close_all(self):
-        """Close every file opened since the last time (if there is a close
-        command)."""
+    def close_all(self, directory=None):
+        """Close the student's files: everything under ``directory`` if
+        there is a ``close_dir`` command, which also catches files opened
+        outside arbiter; otherwise those arbiter opened, if there is a
+        ``close`` command."""
+        if self.close_dir is not None and directory is not None:
+            self._run(self.close_dir, os.path.abspath(directory), "{dir}")
+            self.opened.clear()
+            return
         for path in list(self.opened):
             self.close_file(path)
         self.opened.clear()
@@ -90,7 +98,7 @@ def load_viewer(path=None):
         return None
     if "open" not in viewer:
         raise ConfigError("{}: [viewer] needs an 'open' command".format(path))
-    return Viewer(viewer["open"], viewer.get("close"))
+    return Viewer(viewer["open"], viewer.get("close"), viewer.get("close_dir"))
 
 
 def default_viewer(platform=None, which=shutil.which):

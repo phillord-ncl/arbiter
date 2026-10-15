@@ -283,7 +283,7 @@ def cli(submissions, recursive, arb_path, output, also, root, fresh, tui):
             progress.finished(name)
             done = getattr(chosen[0], "student_done", None) if chosen else None
             if done is not None:
-                done()
+                done(submission)
             if i + 1 < len(todo):
                 upcoming = os.path.basename(os.path.abspath(todo[i + 1]))
                 if not _confirm_next(chosen, name, upcoming, progress):
