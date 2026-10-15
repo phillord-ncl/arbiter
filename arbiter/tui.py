@@ -128,6 +128,16 @@ class QuestionApp(App):
         Binding("ctrl+x", "close_file", "Close in viewer"),
         Binding("ctrl+t", "terminal", "Terminal"),
         Binding("ctrl+r", "restart", "Restart marking"),
+        ## Textual's own command palette, relabelled; declaring it here
+        ## stops Textual adding its default, labelled "palette".
+        Binding(
+            "ctrl+p",
+            "command_palette",
+            "menu",
+            show=False,
+            priority=True,
+            tooltip="Open the command menu",
+        ),
     ]
 
     def __init__(self, question, viewer=None, terminal=None):

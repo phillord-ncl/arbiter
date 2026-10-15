@@ -121,3 +121,17 @@ def test_marked_pane_keeps_a_minimum_width(tmp_path):
     app = QuestionApp(_question(tmp_path))
     before, after = asyncio.run(_drag_splitter(app, 25))
     assert after >= 12
+
+
+async def _footer_labels(app):
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        from textual.widgets._footer import FooterKey
+
+        return [str(k.description) for k in app.query(FooterKey)]
+
+
+def test_command_palette_is_labelled_menu(tmp_path):
+    labels = asyncio.run(_footer_labels(QuestionApp(_question(tmp_path))))
+    assert "menu" in labels
+    assert "palette" not in labels
