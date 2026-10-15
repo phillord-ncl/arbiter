@@ -125,3 +125,31 @@ def test_cli_reports_a_missing_project_directory(tmp_path):
 
     assert result.exit_code != 0
     assert "no project directory" in result.output
+
+
+def test_find_arb_takes_a_single_named_arb_toml(tmp_path, monkeypatch):
+    from arbiter.cli import _find_arb
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "x.arb.toml").write_text("")
+    assert _find_arb() == "x.arb.toml"
+    (tmp_path / "y.arb.toml").write_text("")
+    with pytest.raises(Exception, match="more than one"):
+        _find_arb()
+    (tmp_path / "arb.toml").write_text("")
+    assert _find_arb() == "arb.toml"
+
+
+def test_find_submission_completes_a_short_name(tmp_path, monkeypatch):
+    from arbiter.cli import _find_submission
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "c01@uni.ac.uk").mkdir()
+    (tmp_path / "c02@uni.ac.uk").mkdir()
+    assert _find_submission("c01") == "c01@uni.ac.uk"
+    assert _find_submission("c01@uni.ac.uk") == "c01@uni.ac.uk"
+    assert _find_submission("c99") == "c99"
+    (tmp_path / "d1@a").mkdir()
+    (tmp_path / "d1@b").mkdir()
+    with pytest.raises(Exception, match="more than one"):
+        _find_submission("d1")

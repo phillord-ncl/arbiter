@@ -8,6 +8,7 @@ instead, so an arb.py only ever defines the Exercise itself. An arb.toml
 """
 
 import importlib.util
+import glob
 import os
 import sys
 
@@ -102,21 +103,52 @@ def _choose_ask(tui):
 
 
 def _find_arb():
+    """arb.toml, else arb.py, else the one NAME.arb.toml / NAME.arb.py."""
     for name in ("arb.toml", "arb.py"):
         if os.path.exists(name):
             return name
-    raise click.UsageError("no arb.toml or arb.py in the current directory")
+    for pattern in ("*.arb.toml", "*.arb.py"):
+        found = sorted(glob.glob(pattern))
+        if len(found) == 1:
+            return found[0]
+        if found:
+            raise click.UsageError(
+                "more than one {} here ({}); choose with --arb".format(
+                    pattern, ", ".join(found)
+                )
+            )
+    raise click.UsageError(
+        "no arb.toml, arb.py, *.arb.toml or *.arb.py in the current directory"
+    )
+
+
+def _find_submission(name):
+    """NAME itself, else the one directory called NAME@..., else NAME..."""
+    if os.path.isdir(name):
+        return name
+    for pattern in (glob.escape(name) + "@*", glob.escape(name) + "*"):
+        found = sorted(d for d in glob.glob(pattern) if os.path.isdir(d))
+        if len(found) == 1:
+            return found[0]
+        if found:
+            raise click.UsageError(
+                "{} matches more than one directory: {}".format(
+                    name, ", ".join(found)
+                )
+            )
+    return name
 
 
 @click.command(help="Run an arb.py or arb.toml's Exercise against one submission.")
-@click.argument("submission")
+@click.argument("submission")  # a directory, or a unique NAME@... / NAME...
 @click.option(
     "--arb",
     "arb_path",
     default=None,
     type=click.Path(exists=True, dir_okay=False),
     help="Path to the arb.py or arb.toml defining the Exercise (default: "
-         "arb.toml, else arb.py, in the current directory).",
+         "arb.toml, arb.py, or the one *.arb.toml / *.arb.py, in the "
+         "current directory).",
 )
 @click.option(
     "--output",
@@ -155,6 +187,7 @@ def _find_arb():
          "Default: use it if installed and running in a terminal.",
 )
 def cli(submission, arb_path, output, also, root, fresh, tui):
+    submission = _find_submission(submission)
     arb_path = arb_path or _find_arb()
     if arb_path.endswith(".toml"):
         try:
