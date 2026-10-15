@@ -21,6 +21,7 @@ from .core import UNDECIDED_NOTE, RestartMarking, Result
 from .dump import FILENAME, FORMATS, Dumper, load_previous
 from .scripts import ScriptClash
 from .toml_exercise import ArbTomlError, load_exercise
+from .unpack import UnpackError, unpack
 
 
 def _load_arb(path):
@@ -381,3 +382,51 @@ def _mark(submission, arb_path, output, also, root, fresh, choose, batch):
             )
     for path in dumper.paths():
         click.echo("results written to {}".format(path), err=True)
+
+
+@click.command(name="unpack")
+@click.argument("submissions", nargs=-1, required=True)
+@click.option(
+    "-r",
+    "--recursive",
+    is_flag=True,
+    help="Each argument is a directory whose subdirectories are the "
+         "submissions.",
+)
+@click.option(
+    "--into",
+    default="project",
+    show_default=True,
+    help="The directory to make in each submission (the arb.toml's root).",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Replace the directory if it already exists (by default it is "
+         "left alone).",
+)
+def unpack_cmd(submissions, recursive, into, force):
+    """Make a project directory in each SUBMISSION from the files the
+    student uploaded.
+
+    An archive (zip or tar) is unpacked, whether it holds one directory, the
+    files loose at the top, or directories nested pointlessly; a submission
+    of plain files has them copied. The originals are kept."""
+    failed = 0
+    for submission in _expand(submissions, recursive):
+        name = os.path.basename(os.path.abspath(submission))
+        try:
+            click.echo("{}: {}".format(name, unpack(submission, into, force)))
+        except UnpackError as e:
+            failed += 1
+            click.echo("{}: {}".format(name, e), err=True)
+    if failed:
+        raise click.ClickException("{} submission(s) not unpacked".format(failed))
+
+
+def main():
+    """The ``arbiter`` command: ``arbiter unpack ...``, else marking."""
+    if sys.argv[1:2] == ["unpack"]:
+        unpack_cmd(sys.argv[2:], prog_name="arbiter unpack")
+    else:
+        cli()
