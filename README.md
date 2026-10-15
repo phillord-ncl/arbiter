@@ -13,7 +13,7 @@ without notice.
 
 ## Installing
 
-`arbiter` needs Python 3.14 or later and [pipx](https://pipx.pypa.io/).
+`arbiter` needs Python 3.12 or later and [pipx](https://pipx.pypa.io/).
 
 ```
 pipx install "arbiter[tui] @ git+https://github.com/phillord-ncl/arbiter.git"
