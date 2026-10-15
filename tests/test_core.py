@@ -85,7 +85,7 @@ def test_match_stdout_detects_a_mismatch(tmp_path):
 
 
 def test_two_run_markers_do_not_leak_context(tmp_path):
-    """The worked example notes.org asked for: two RunMarkers in one
+    """A worked example: two RunMarkers in one
     Exercise, where the second Marker's python() step runs (in the first,
     mechanical pass) *after* the first Marker's own python() step but
     *before* the first Marker's deferred judgement step is finally asked

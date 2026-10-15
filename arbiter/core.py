@@ -1,4 +1,4 @@
-"""Plan/run execution model -- see ../notes.org for the design discussion.
+"""Plan/run execution model.
 
 Every ``Marker`` builder method records a ``Step`` rather than acting on
 it; nothing runs until ``Exercise.run()``. ``run()`` makes two passes over

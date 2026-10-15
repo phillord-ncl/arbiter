@@ -1,4 +1,4 @@
-"""Matchers for ``RunMarker.match_stdout`` -- see ../notes.org.
+"""Matchers for ``RunMarker.match_stdout``.
 
 Each matcher is one case: if it matches the text it yields its own
 feedback and score. ``match_stdout`` tries its matchers in order and uses
