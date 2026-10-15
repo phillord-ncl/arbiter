@@ -7,6 +7,7 @@ question gets its own short-lived app rather than one app driving the run.
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
+from rich.text import Text
 from textual import events
 from textual.containers import Horizontal, VerticalScroll
 from textual.widget import Widget
@@ -34,19 +35,32 @@ def _header_text(question):
     return "\n".join(lines)
 
 
+def _score_style(result):
+    """Green for full marks, red for none (or a deduction), else orange."""
+    if result.score >= result.out_of:
+        return "green"
+    if result.score <= 0:
+        return "red"
+    return "dark_orange"
+
+
 def _marked_text(question):
     session = question.session
     if session is None or not session.marked:
-        return "Nothing marked yet."
-    lines = []
+        return Text("Nothing marked yet.")
+    text = Text()
     for criterion, result in session.marked:
         who = "you" if result.decided_by == "human" else "AUTO"
-        lines.append(
-            "[{}] {}: {}/{}\n    {}".format(
-                who, criterion or "(none)", result.score, result.out_of, result.feedback
-            )
+        if text:
+            text.append("\n")
+        text.append(
+            "{}/{}".format(result.score, result.out_of),
+            style=_score_style(result),
         )
-    return "\n".join(lines)
+        text.append(" [{}] {}\n    {}".format(
+            who, criterion or "(none)", result.feedback
+        ))
+    return text
 
 
 def _question_text(question):
@@ -191,25 +205,32 @@ class QuestionApp(App):
         self.query_one("#marked").border_title = "Marked so far"
         self.query_one("#score").focus()
 
-    def _current_item(self):
+    def _file_item(self):
+        """The file for Ctrl-O/Ctrl-X: this tab's if it is a file, else the
+        next file's tab, else the first file."""
         pane_id = self.query_one("#context", TabbedContent).active
-        if pane_id.startswith("item"):
-            return self.question.context[int(pane_id[len("item"):])]
+        items = self.question.context
+        here = int(pane_id[len("item"):]) if pane_id.startswith("item") else -1
+        if here >= 0 and items[here].path is not None:
+            return items[here]
+        for item in items[here + 1:] + items[:here + 1]:
+            if item.path is not None:
+                return item
         return None
 
     def action_open_file(self):
-        item = self._current_item()
         if self.viewer is None:
             self.notify("No viewer configured (see docs/viewer.md)")
             return
-        if item is None or item.path is None:
-            self.notify("This tab is not a file; switch to a file's tab first")
+        item = self._file_item()
+        if item is None:
+            self.notify("There is no file to open")
             return
         self.viewer.open_file(item.path)
 
     def action_close_file(self):
-        item = self._current_item()
-        if self.viewer is not None and item is not None and item.path is not None:
+        item = self._file_item()
+        if self.viewer is not None and item is not None:
             self.viewer.close_file(item.path)
 
     def action_restart(self):

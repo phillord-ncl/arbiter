@@ -78,8 +78,8 @@ def test_header_and_marked_panel(tmp_path):
     assert "Student/Directory: alice" in header
     assert "Criterion: style" in header
     marked = _marked_text(question)
-    assert "[AUTO] output: 7/10" in marked
-    assert "[you] style: 1/2" in marked
+    assert "7/10 [AUTO] output" in marked
+    assert "1/2 [you] style" in marked
 
 
 def test_question_tab_shows_task_and_assignment_tab(tmp_path):
@@ -149,3 +149,58 @@ async def _splitter_text(app):
 
 def test_the_splitter_draws_no_text(tmp_path):
     assert asyncio.run(_splitter_text(QuestionApp(_question(tmp_path)))) == ""
+
+
+def test_marked_scores_are_coloured_by_result(tmp_path):
+    from arbiter.core import Result
+    from arbiter.tui import _marked_text
+
+    question = _question(tmp_path)
+    question.session.marked = [
+        ("a", Result(score=10, out_of=10, feedback="ok", decided_by="auto")),
+        ("b", Result(score=1, out_of=2, feedback="some", decided_by="human")),
+        ("c", Result(score=0, out_of=3, feedback="none", decided_by="human")),
+        ("d", Result(score=-1, out_of=0, feedback="deduct", decided_by="human")),
+    ]
+    text = _marked_text(question)
+    styles = {text.plain[s.start:s.end]: str(s.style) for s in text.spans}
+    assert styles == {
+        "10/10": "green",
+        "1/2": "dark_orange",
+        "0/3": "red",
+        "-1/0": "red",
+    }
+    assert text.plain.startswith("10/10 [AUTO] a")
+
+
+class _Viewer:
+    def __init__(self):
+        self.opened = []
+
+    def open_file(self, path):
+        self.opened.append(path)
+
+    def close_file(self, path):
+        pass
+
+
+async def _open_from(app, tab):
+    async with app.run_test(size=(100, 30)) as pilot:
+        app.query_one("#context").active = tab
+        await pilot.pause()
+        await pilot.press("ctrl+o")
+
+
+def test_open_from_a_non_file_tab_opens_the_next_file(tmp_path):
+    for tab in ("question", "item0"):  # item0 is the stdout text item
+        viewer = _Viewer()
+        app = QuestionApp(_question(tmp_path), viewer=viewer)
+        asyncio.run(_open_from(app, tab))
+        assert viewer.opened == [str(tmp_path / "s.py")], tab
+
+
+def test_open_from_a_file_tab_opens_that_file(tmp_path):
+    viewer = _Viewer()
+    app = QuestionApp(_question(tmp_path), viewer=viewer)
+    asyncio.run(_open_from(app, "item1"))
+    assert viewer.opened == [str(tmp_path / "s.py")]
