@@ -206,6 +206,8 @@ def test_default_terminals_per_platform():
     assert default_command("linux", only("xterm"), {}) == ["xterm"]
     assert default_command("linux", only("xterm"), {"TERMINAL": "foot -e"}) == ["foot", "-e"]
     assert default_command("linux", none, {}) is None
+    both = lambda n: n if n in ("xdg-terminal-exec", "xterm") else None
+    assert default_command("linux", both, {}) == ["xdg-terminal-exec"]
 
 
 def test_no_terminal_is_a_clear_error():

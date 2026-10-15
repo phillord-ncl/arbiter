@@ -38,6 +38,7 @@ open = "kitty --directory {dir}"
 `{dir}` is the submission's full path. The terminal is also started with
 that directory as its working directory, so one with no directory option
 still opens in the right place. Which shell runs inside is the terminal's
-business. With nothing configured, `arbiter` guesses: `$TERMINAL` or the
-first of a few common terminals on Linux, Terminal on macOS, `wt` (else
+business. With nothing configured, `arbiter` guesses: `$TERMINAL`, else
+`xdg-terminal-exec` (the desktop's own choice), else the first of a few
+common terminals on Linux, Terminal on macOS, `wt` (else
 `cmd`) on Windows.

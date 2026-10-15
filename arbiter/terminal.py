@@ -25,7 +25,10 @@ def _system(platform=None):
     return "darwin" if platform == "darwin" else "linux"
 
 
+## xdg-terminal-exec starts the desktop's own choice of terminal, so it is
+## tried before guessing by name.
 LINUX_TERMINALS = (
+    "xdg-terminal-exec",
     "x-terminal-emulator",
     "gnome-terminal",
     "konsole",
