@@ -45,7 +45,8 @@ def is_windows():
 
 def interpreter(python_version=None, windows=None):
     """The command that makes a venv: ``python3`` / ``py -3``, or for a
-    version, ``python3.14`` / ``py -3.14``."""
+    version, ``python3.14`` / ``py -3.14``. The Windows script falls back to
+    plain ``python`` when there is no ``py`` launcher."""
     windows = is_windows() if windows is None else windows
     if windows:
         return ["py", "-" + (python_version or "3")]
@@ -74,7 +75,12 @@ def render(script, python_version=None, windows=None):
             "rem {}: {}".format(TAG, script.name),
             'cd /d "%~dp0"',
             "if not exist {} (".format(py),
-            "    {} -m venv {}".format(subprocess.list2cmdline(make), VENV),
+            "    where py >nul 2>nul",
+            "    if errorlevel 1 (",
+            "        python -m venv {}".format(VENV),
+            "    ) else (",
+            "        {} -m venv {}".format(subprocess.list2cmdline(make), VENV),
+            "    )",
             "    if errorlevel 1 exit /b 1",
             ")",
             "if exist requirements.txt (",
