@@ -51,6 +51,10 @@ def default_command(system, which=shutil.which, environ=os.environ):
         return shlex.split(environ["TERMINAL"])
     for name in LINUX_TERMINALS:
         if which(name):
+            if name == "xdg-terminal-exec":
+                ## With no command it can start nothing visible (ptyxis
+                ## just re-activates), so ask for a shell.
+                return [name, environ.get("SHELL") or "sh"]
             return [name]
     return None
 
