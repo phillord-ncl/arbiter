@@ -16,7 +16,7 @@ without notice.
 `arbiter` needs Python 3.14 or later and [pipx](https://pipx.pypa.io/).
 
 ```
-pipx install "git+https://github.com/phillord-ncl/arbiter.git#egg=arbiter[tui]"
+pipx install "arbiter[tui] @ git+https://github.com/phillord-ncl/arbiter.git"
 ```
 
 Keep the quotes. Drop `[tui]` for the plain command line version without the
