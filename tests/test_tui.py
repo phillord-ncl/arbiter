@@ -327,3 +327,42 @@ def test_tab_to_feedback_shows_the_full_marks_text(tmp_path):
             assert app.query_one("#feedback").value == "Correct"
 
     asyncio.run(go())
+
+
+def test_configure_viewer_saves_and_applies_the_choice(tmp_path):
+    from arbiter.config import load_viewer
+
+    config = str(tmp_path / "config.toml")
+    app = QuestionApp(_question(tmp_path), config_path=config)
+
+    async def go():
+        async with app.run_test() as pilot:
+            app.action_configure_viewer()
+            await pilot.pause()
+            await pilot.press("down", "down", "enter")  # third choice: VS Code
+            await pilot.pause()
+
+    asyncio.run(go())
+    assert app.viewer.open.split()[0] in ("code", "code.cmd")
+    assert load_viewer(config).open == app.viewer.open
+
+
+def test_configure_viewer_escape_changes_nothing(tmp_path):
+    config = tmp_path / "config.toml"
+    app = QuestionApp(_question(tmp_path), config_path=str(config))
+
+    async def go():
+        async with app.run_test() as pilot:
+            app.action_configure_viewer()
+            await pilot.pause()
+            await pilot.press("escape")
+            await pilot.pause()
+
+    asyncio.run(go())
+    assert app.viewer is None and not config.exists()
+
+
+def test_configure_viewer_is_in_the_menu(tmp_path):
+    from arbiter.tui import ViewerCommands
+
+    assert ViewerCommands in QuestionApp.COMMANDS

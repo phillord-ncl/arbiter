@@ -5,6 +5,22 @@ comes with context: the program's output and the files in the submission.
 Out of the box the UI shows these itself, in tabs. If you would rather read
 the code in your own editor, tell `arbiter` how to open it.
 
+## Choosing a viewer from the UI
+
+Press Ctrl-P (the menu) and choose **Configure viewer**. Pick Emacsclient,
+Emacs, Visual Studio Code or PyCharm, or none. The choice takes effect at once and is
+written to `config.toml` (below), replacing any `[viewer]` section there and
+leaving the rest of the file alone. The command is the usual one for your
+platform: `emacsclient` (`emacsclientw.exe` on Windows), plain `emacs`
+(`open -a Emacs` on macOS, `runemacs.exe` on Windows), `code` (`code.cmd`
+on Windows), and `pycharm` (`pycharm.cmd` on Windows, `open -a PyCharm` on
+macOS). The program must be on your `PATH`; if yours is not, or you need
+different options, edit the file by hand as below. Emacsclient needs a
+running server, and on Linux and macOS gets the close commands too. Plain
+Emacs starts Emacs for the files and cannot close them again, so it has no
+close commands. It uses `detach = true` so arbiter does not wait for Emacs to
+exit; set that in a hand-written `[viewer]` for any program that stays running.
+
 ## Configuration
 
 Create `config.toml` in the per-user config directory:

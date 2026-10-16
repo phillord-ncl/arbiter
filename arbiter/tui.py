@@ -9,10 +9,15 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from rich.text import Text
 from textual import events
+from textual.command import Hit, Provider
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.screen import ModalScreen
 from textual.widget import Widget
-from textual.widgets import Footer, Input, Label, Static, TabbedContent, TabPane
+from textual.widgets import (
+    Footer, Input, Label, OptionList, Static, TabbedContent, TabPane,
+)
 
+from .config import VIEWER_CHOICES, VIEWER_LABELS, save_viewer
 from .core import UNDECIDED_NOTE, RestartMarking, Result
 from .terminal import TerminalError, open_terminal
 
@@ -144,7 +149,61 @@ class Splitter(Widget):
         self.target.styles.width = width
 
 
+class ViewerScreen(ModalScreen):
+    """Pick the viewer to open files in; dismissed with the choice's name,
+    "none" to go back to showing files in the UI, or None if cancelled."""
+
+    DEFAULT_CSS = """
+    ViewerScreen { align: center middle; }
+    #viewer-dialog { width: 60; height: auto; border: round $primary;
+                     background: $surface; padding: 1 2; }
+    """
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="viewer-dialog"):
+            yield Label("Open files in which viewer?", markup=False)
+            yield OptionList(
+                *[VIEWER_LABELS[name] for name in VIEWER_CHOICES],
+                "None (show files in arbiter only)",
+                id="viewer-choices",
+            )
+
+    def on_option_list_option_selected(self, event):
+        index = event.option_index
+        self.dismiss(VIEWER_CHOICES[index] if index < len(VIEWER_CHOICES) else "none")
+
+    def action_cancel(self):
+        self.dismiss(None)
+
+
+class ViewerCommands(Provider):
+    """The "Configure viewer" entry in the menu (Ctrl-P)."""
+
+    TITLE = "Configure viewer"
+
+    async def discover(self):
+        yield Hit(
+            1,
+            "Configure viewer",
+            self.app.action_configure_viewer,
+            help="Choose Emacs, Emacsclient, VS Code or PyCharm for Ctrl-O",
+        )
+
+    async def search(self, query):
+        match = self.matcher(query).match("Configure viewer")
+        if match > 0:
+            yield Hit(
+                match,
+                "Configure viewer",
+                self.app.action_configure_viewer,
+                help="Choose Emacs, Emacsclient, VS Code or PyCharm for Ctrl-O",
+            )
+
+
 class QuestionApp(App, inherit_bindings=False):
+    COMMANDS = App.COMMANDS | {ViewerCommands}
+
     CSS = """
     #header { background: $boost; padding: 0 1; }
     #body { height: 1fr; }
@@ -179,8 +238,12 @@ class QuestionApp(App, inherit_bindings=False):
         ),
     ]
 
-    def __init__(self, question, viewer=None, terminal=None, progress=None):
+    def __init__(
+        self, question, viewer=None, terminal=None, progress=None, config_path=None
+    ):
         super().__init__()
+        ## Where "Configure viewer" saves; None for the user's config.toml.
+        self.config_path = config_path
         self.question = question
         ## A cli.Progress when marking a batch, else None.
         self.progress = progress
@@ -267,6 +330,21 @@ class QuestionApp(App, inherit_bindings=False):
         ids = [pane.id for pane in context.query(TabPane)]
         if ids and context.active in ids:
             context.active = ids[(ids.index(context.active) + step) % len(ids)]
+
+    def action_configure_viewer(self):
+        self.push_screen(ViewerScreen(), self._viewer_chosen)
+
+    def _viewer_chosen(self, name):
+        if name is None:
+            return
+        try:
+            self.viewer = save_viewer(None if name == "none" else name, self.config_path)
+        except OSError as e:
+            self.notify("Cannot save the config: {}".format(e), severity="error")
+            return
+        self.notify(
+            "Viewer: {}".format(VIEWER_LABELS.get(name, "none")) + " (saved)"
+        )
 
     def action_restart(self):
         self.restart = True
@@ -375,9 +453,13 @@ def make_ask_interactively(viewer=None, terminal=None, progress=None):
     """An ``ask_interactively`` hook that shows each question in a
     ``QuestionApp``. Quitting the app without answering stops marking."""
 
+    ## "Configure viewer" can replace the viewer part way through.
+    current = {"viewer": viewer}
+
     def ask(question):
-        app = QuestionApp(question, viewer, terminal, progress)
+        app = QuestionApp(question, current["viewer"], terminal, progress)
         app.run()
+        current["viewer"] = app.viewer
         if app.restart:
             raise RestartMarking()
         if app.result is None:
@@ -390,8 +472,8 @@ def make_ask_interactively(viewer=None, terminal=None, progress=None):
         return bool(app.carry_on)
 
     def student_done(submission):
-        if viewer is not None:
-            viewer.close_all(submission)
+        if current["viewer"] is not None:
+            current["viewer"].close_all(submission)
 
     ask.next_student = next_student
     ask.student_done = student_done

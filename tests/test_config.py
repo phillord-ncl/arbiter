@@ -97,3 +97,53 @@ def test_close_dir_is_used_for_everything_under_the_directory(tmp_path):
     viewer.close_all(str(tmp_path / "s 1"))
     assert log.read_text() == "dir {}\n".format(tmp_path / "s 1")
     assert viewer.opened == []
+
+
+from arbiter.config import preset_viewer, save_viewer
+
+
+def test_presets_differ_by_platform():
+    assert preset_viewer("vscode", "linux").open.startswith("code ")
+    assert preset_viewer("vscode", "win32").open.startswith("code.cmd ")
+    assert preset_viewer("emacsclient", "linux").open.startswith("emacsclient ")
+    assert preset_viewer("emacsclient", "win32").open.startswith("emacsclientw.exe ")
+    assert preset_viewer("emacsclient", "win32").close is None
+    assert preset_viewer("emacsclient", "linux").close_dir is not None
+    assert preset_viewer("emacs", "linux").open == "emacs {file}"
+    assert preset_viewer("emacs", "linux").detach
+    assert preset_viewer("emacs", "win32").open.startswith("runemacs.exe ")
+    assert preset_viewer("emacs", "darwin").open.startswith("open -a Emacs")
+    assert preset_viewer("pycharm", "darwin").open.startswith("open -a PyCharm")
+
+
+def test_saved_viewer_loads_back(tmp_path):
+    path = str(tmp_path / "sub" / "config.toml")
+    for name in ("emacsclient", "emacs"):
+        saved = save_viewer(name, path, "linux")
+        assert load_viewer(path) == saved
+
+
+def test_detached_viewer_does_not_wait(tmp_path):
+    viewer = Viewer(
+        sys.executable + " -c 'import time; time.sleep(30)' {file}", detach=True
+    )
+    viewer.open_file(str(tmp_path / "f"))  # would hang for 30s if it waited
+
+
+def test_save_viewer_replaces_only_the_viewer_section(tmp_path):
+    path = _write(
+        tmp_path,
+        '[terminal]\nopen = "kitty {dir}"\n\n[viewer]\nopen = "old {file}"\n'
+        'close = "x"\n\n[other]\na = 1\n',
+    )
+    save_viewer("vscode", path, "linux")
+    text = (tmp_path / "config.toml").read_text()
+    assert 'open = "kitty {dir}"' in text and "[other]" in text
+    assert "old" not in text and text.count("[viewer]") == 1
+    assert load_viewer(path).open == "code --reuse-window {file}"
+
+
+def test_save_none_removes_the_viewer(tmp_path):
+    path = _write(tmp_path, '[viewer]\nopen = "old {file}"\n')
+    assert save_viewer(None, path) is None
+    assert load_viewer(path) is None
