@@ -5,7 +5,7 @@ import pytest
 from click.testing import CliRunner
 
 from arbiter.cli import cli
-from arbiter.core import Exercise, RestartMarking, Result, RunMarker, Step
+from arbiter.core import Exercise, GoBack, RestartMarking, Result, RunMarker, Step
 from arbiter.dump import Dumper, load_previous
 
 
@@ -110,6 +110,86 @@ def test_restart_reruns_everything_and_remembers_answers(tmp_path):
     assert calls == [("one?", None), ("two?", None), ("one?", 3), ("two?", None)]
     assert exercise.restarts == 1
     assert len(exercise.markers[0].results) == 1  # not doubled up
+
+
+def test_go_back_asks_the_previous_question_again_prefilled(tmp_path):
+    exercise = _exercise(tmp_path)
+    calls = []
+
+    def ask(question):
+        calls.append((question.question, question.previous.score if question.previous else None))
+        if len(calls) == 2:
+            raise GoBack()
+        return _human(3 if len(calls) == 1 else 5)
+
+    exercise.run(ask)
+    assert calls == [("one?", None), ("two?", None), ("one?", 3), ("two?", None)]
+    assert exercise.restarts == 0
+    # the re-answered question is not counted twice
+    assert [r.score for m in exercise.markers for r in m.results] == [5, 5]
+
+
+def test_go_back_on_the_first_question_asks_it_again(tmp_path):
+    exercise = _exercise(tmp_path)
+    calls = []
+
+    def ask(question):
+        calls.append(question.question)
+        if len(calls) == 1:
+            raise GoBack()
+        return _human(2)
+
+    exercise.run(ask)
+    assert calls == ["one?", "one?", "two?"]
+
+
+def test_go_back_checkpoints_keep_the_withdrawn_answer(tmp_path):
+    exercise = _exercise(tmp_path)
+    kept = []
+
+    def ask(question):
+        if question.question == "two?" and not kept:
+            kept.append(1)
+            raise GoBack()
+        return _human(1)
+
+    seen = []
+    exercise.run(ask, checkpoint=lambda e: seen.append(dict(e.stored)))
+    assert any("a:1" in stored for stored in seen)
+
+
+def test_plain_prompt_back_raises_go_back(monkeypatch):
+    from arbiter.cli import _default_ask_interactively
+    from arbiter.core import Question, Session
+
+    session = Session("s", "a", 0, 5, 2, 2)
+    question = Question("?", 5, session=session)
+    monkeypatch.setattr("builtins.input", lambda prompt: "back")
+    with pytest.raises(GoBack):
+        _default_ask_interactively(question)
+
+
+def test_tui_back_key_raises_go_back_except_on_first_question():
+    pytest.importorskip("textual")
+    from arbiter.core import Question, Session
+    from arbiter.tui import QuestionApp
+
+    def press(position):
+        session = Session("s", "a", 0, 5, position, 2)
+        app = QuestionApp(Question("?", 5, session=session))
+
+        async def go():
+            async with app.run_test() as pilot:
+                await pilot.press("ctrl+b")
+                if position == 1:
+                    await pilot.press("enter", "enter")
+
+        asyncio.run(go())
+        return app
+
+    assert press(2).back
+    first = press(1)
+    assert not first.back and first.result is not None
 
 
 def test_plain_prompt_keeps_stored_answer_on_enter_and_restarts(monkeypatch):

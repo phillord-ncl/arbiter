@@ -17,7 +17,7 @@ import tomllib
 import click
 
 from .config import ConfigError, default_viewer, load_terminal, load_viewer
-from .core import UNDECIDED_NOTE, RestartMarking, Result
+from .core import UNDECIDED_NOTE, GoBack, RestartMarking, Result
 from .dump import FILENAME, FORMATS, Dumper, load_previous
 from .scripts import ScriptClash
 from .toml_exercise import ArbTomlError, load_exercise
@@ -58,10 +58,14 @@ def _default_ask_interactively(question):
             )
         )
     click.echo("(type 'restart' to mark this submission again from the start)")
+    if session is not None and session.position > 1:
+        click.echo("(type 'back' to return to the previous question)")
     while True:
         answer = input(question.question)
         if answer.strip().lower() == "restart":
             raise RestartMarking()
+        if answer.strip().lower() == "back":
+            raise GoBack()
         if previous is not None and not answer.strip():
             return Result(
                 out_of=question.out_of, score=previous.score, feedback=previous.feedback

@@ -18,7 +18,7 @@ from textual.widgets import (
 )
 
 from .config import VIEWER_CHOICES, VIEWER_LABELS, save_viewer
-from .core import UNDECIDED_NOTE, RestartMarking, Result
+from .core import UNDECIDED_NOTE, GoBack, RestartMarking, Result
 from .terminal import TerminalError, open_terminal
 
 
@@ -223,6 +223,7 @@ class QuestionApp(App, inherit_bindings=False):
         Binding("ctrl+o", "open_file", "Open in viewer"),
         Binding("ctrl+x", "close_file", "Close in viewer"),
         Binding("ctrl+t", "terminal", "Terminal"),
+        Binding("ctrl+b", "back", "Previous question"),
         Binding("ctrl+r", "restart", "Restart marking"),
         Binding("ctrl+q", "quit", "Quit", priority=True),
         Binding("ctrl+c", "help_quit", show=False, system=True),
@@ -253,6 +254,7 @@ class QuestionApp(App, inherit_bindings=False):
         self.terminal = terminal
         self.result = None
         self.restart = False
+        self.back = False
 
     def compose(self) -> ComposeResult:
         yield Label(_header_text(self.question), id="header", markup=False)
@@ -345,6 +347,14 @@ class QuestionApp(App, inherit_bindings=False):
         self.notify(
             "Viewer: {}".format(VIEWER_LABELS.get(name, "none")) + " (saved)"
         )
+
+    def action_back(self):
+        session = self.question.session
+        if session is None or session.position <= 1:
+            self.notify("This is the first question")
+            return
+        self.back = True
+        self.exit()
 
     def action_restart(self):
         self.restart = True
@@ -462,6 +472,8 @@ def make_ask_interactively(viewer=None, terminal=None, progress=None):
         current["viewer"] = app.viewer
         if app.restart:
             raise RestartMarking()
+        if app.back:
+            raise GoBack()
         if app.result is None:
             raise KeyboardInterrupt("question not answered")
         return app.result

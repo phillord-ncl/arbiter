@@ -18,6 +18,15 @@ score is no longer allowed, it is ignored.
 
 `--fresh` ignores the file and starts with empty boxes.
 
+## Going back a question
+
+Ctrl-B (or `back` at the plain prompt) returns to the previous question in
+this submission, with your score and feedback pre-filled so either can be
+changed. Press it again to go further back. Nothing is lost: the answer you
+leave is kept as a stored one until you reach it again. It only moves within
+the current student; to correct one already finished, run `arbiter` on that
+submission again.
+
 ## Restarting after editing the submission
 
 If something not the student's fault stops the program running, fix it in a

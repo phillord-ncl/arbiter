@@ -33,6 +33,12 @@ class RestartMarking(Exception):
     say). Answers already given come back as the stored ones."""
 
 
+class GoBack(Exception):
+    """Raised by an ask hook to withdraw the previous human answer and ask
+    that question again, its answer pre-filled. Does nothing on the first
+    question."""
+
+
 UNDECIDED_NOTE = "(The automatic checks could not decide this one.)"
 
 
@@ -663,7 +669,10 @@ class Exercise:
                 marker.result(_undecided_result(held, ctx))
         if checkpoint is not None:
             checkpoint(self)
-        for position, (marker, step, ctx, qid) in enumerate(questions, 1):
+        index = 0
+        while index < len(questions):
+            marker, step, ctx, qid = questions[index]
+            position = index + 1
             question = step.action(ctx)
             stored = self.stored.get(qid)
             if stored is not None and question.accepts(stored.score):
@@ -681,14 +690,31 @@ class Exercise:
                 directory,
                 [s.name for s in self.all_scripts()] if self.use_scripts else [],
             )
-            answer = ask_interactively(question)
+            try:
+                answer = ask_interactively(question)
+            except GoBack:
+                if index > 0:
+                    index -= 1
+                    back_marker, _, _, back_qid = questions[index]
+                    self._withdraw(back_marker, back_qid)
+                    if checkpoint is not None:
+                        checkpoint(self)
+                continue
             answer.decided_by = "human"
             answer.question_id = qid
             marker.result(answer)
             self.given[qid] = answer
             self.stored.pop(qid, None)
+            index += 1
             if checkpoint is not None:
                 checkpoint(self)
+
+    def _withdraw(self, marker, qid):
+        """Take back the human answer to ``qid``, keeping it as the stored
+        one so the question comes back pre-filled."""
+        answer = self.given.pop(qid)
+        marker.results = [r for r in marker.results if r is not answer]
+        self.stored[qid] = answer
 
     def check_consistent_with_rubric_toml(self, path):
         """Cross-check this Exercise's own Markers against a tent-pole
