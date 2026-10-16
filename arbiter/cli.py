@@ -61,6 +61,15 @@ def _default_ask_interactively(question):
     click.echo("(type 'restart' to mark this submission again from the start)")
     if session is not None and session.position > 1:
         click.echo("(type 'back' to return to the previous question)")
+    if question.feedback_only:
+        click.echo(question.question)
+        while True:
+            feedback = input("Feedback: ").strip()
+            if not question.feedback_problem(0, feedback):
+                return Result(
+                    out_of=0, score=0, feedback=feedback or question.default_feedback(0)
+                )
+            click.echo("Feedback is required.")
     while True:
         answer = input(question.question)
         if answer.strip().lower() == "restart":
@@ -89,6 +98,24 @@ def _default_ask_interactively(question):
             score=score,
             feedback=feedback or question.default_feedback(score),
         )
+
+
+def _mark_good_ask(question):
+    """Answer every question with full marks and its full-marks feedback."""
+    score = question.out_of
+    if not question.accepts(score):
+        score = max(question.choices)
+    return Result(
+        out_of=question.out_of, score=score, feedback=question.default_feedback(score)
+    )
+
+
+def _mark_bad_ask(question):
+    """Answer every question with the lowest allowed score."""
+    score = min(question.choices) if question.choices is not None else 0
+    return Result(
+        out_of=question.out_of, score=score, feedback=question.default_feedback(score)
+    )
 
 
 class Progress:
@@ -267,6 +294,26 @@ def _find_submission(name):
          "Default: use it if installed and running in a terminal.",
 )
 @click.option(
+    "--mark-good",
+    "mark_good",
+    is_flag=True,
+    help="Answer every question with full marks and its full-marks feedback, "
+         "without asking, to check what a perfect submission is told. "
+         "With no submission, runs on an empty project and prints the "
+         "answers, writing nothing. With one, implies --fresh and "
+         "overwrites its results: use a copy.",
+)
+@click.option(
+    "--mark-bad",
+    "mark_bad",
+    is_flag=True,
+    help="Answer every question with its lowest allowed score (zero, or the "
+         "worst choice) and no feedback, without asking. With no submission, "
+         "runs on an empty project and prints the answers, writing "
+         "nothing. With one, implies --fresh and overwrites its results: "
+         "use a copy.",
+)
+@click.option(
     "--dry-run",
     "dry_run",
     is_flag=True,
@@ -274,12 +321,21 @@ def _find_submission(name):
          "nothing is run or written and answers are thrown away. For "
          "writing an arb file.",
 )
-def cli(submissions, recursive, arb_path, output, also, root, fresh, tui, dry_run):
+def cli(
+    submissions, recursive, arb_path, output, also, root, fresh, tui, dry_run, mark_good,
+    mark_bad,
+):
     arb_path = arb_path or _find_arb()
     if dry_run:
         if submissions:
             raise click.UsageError("--dry-run takes no submission")
         _dry_run(arb_path, root, tui)
+        return
+    if mark_good and mark_bad:
+        raise click.UsageError("--mark-good and --mark-bad are exclusive")
+    auto = _mark_good_ask if mark_good else _mark_bad_ask if mark_bad else None
+    if auto and not submissions:
+        _dry_run(arb_path, root, tui, auto)
         return
     if not submissions:
         raise click.UsageError("Missing argument 'SUBMISSIONS...'.")
@@ -291,12 +347,14 @@ def cli(submissions, recursive, arb_path, output, also, root, fresh, tui, dry_ru
     ## One submission named outright is marked again whatever its state;
     ## among several, the complete ones are skipped.
     batch = len(found) > 1 or recursive
+    if auto:
+        fresh = True
     progress = Progress(len(found))
     chosen = []
 
     def choose():
         if not chosen:
-            chosen.append(_choose_ask(tui, progress))
+            chosen.append(auto or _choose_ask(tui, progress))
         return chosen[0]
 
     todo = []
@@ -319,7 +377,9 @@ def cli(submissions, recursive, arb_path, output, also, root, fresh, tui, dry_ru
                 done(submission)
             if i + 1 < len(todo):
                 upcoming = os.path.basename(os.path.abspath(todo[i + 1]))
-                if not _confirm_next(chosen, name, upcoming, progress):
+                if not auto and not _confirm_next(
+                    chosen, name, upcoming, progress
+                ):
                     raise KeyboardInterrupt
     except KeyboardInterrupt:
         click.echo("Stopped. Answers so far are saved; run again to resume.",
@@ -343,17 +403,18 @@ def _confirm_next(chosen, finished, upcoming, progress):
     return True
 
 
-def _dry_run(arb_path, root, tui):
+def _dry_run(arb_path, root, tui, auto=None):
     """Walk the whole scheme on an empty project in a temporary directory,
     so an arb file's author sees what a marker will. The student's code is
-    never run, and no results or scripts are written."""
+    never run, and no results or scripts are written. With ``auto``, that
+    hook answers the questions and the results are printed."""
     with tempfile.TemporaryDirectory(prefix="arbiter-dry-run-") as tmp:
         if arb_path.endswith(".toml"):
             try:
                 exercise, rubric_toml = load_exercise(arb_path, tmp, root)
             except ArbTomlError as e:
                 raise click.ClickException("{}: {}".format(arb_path, e))
-            ask_interactively = _choose_ask(tui)
+            ask_interactively = auto or _choose_ask(tui)
         else:
             module = _load_arb(arb_path)
             project_dir = os.path.join(tmp, root) if root else tmp
@@ -362,7 +423,7 @@ def _dry_run(arb_path, root, tui):
             exercise.directory = project_dir
             rubric_toml = getattr(module, "RUBRIC_TOML", None)
             ask_interactively = (
-                getattr(module, "ask_interactively", None) or _choose_ask(tui)
+                auto or getattr(module, "ask_interactively", None) or _choose_ask(tui)
             )
         if rubric_toml is not None:
             exercise.apply_rubric(rubric_toml)
@@ -378,6 +439,15 @@ def _dry_run(arb_path, root, tui):
         except KeyboardInterrupt:
             click.echo("Dry run stopped.", err=True)
             sys.exit(1)
+        if auto:
+            for marker in exercise.markers:
+                for result in marker.results:
+                    click.echo(
+                        "{}: {}/{} -- {}".format(
+                            marker.criterion, result.score, result.out_of,
+                            result.feedback,
+                        )
+                    )
     click.echo("Dry run: nothing was written.", err=True)
 
 

@@ -130,3 +130,28 @@ def test_default_arb_lookup_prefers_arb_toml_over_arb_py(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     result = CliRunner().invoke(cli, [str(tmp_path)])
     assert result.exit_code == 0, result.output
+
+
+def test_check_feedback_is_written_by_the_author_else_what_the_check_found(tmp_path):
+    from arbiter.core import Exercise
+    from arbiter.toml_exercise import load_exercise
+
+    (tmp_path / "a.py").write_text("print('hi')\n")
+    arb = tmp_path / "x.arb.toml"
+
+    def run(extra):
+        arb.write_text(
+            '[[marker]]\ncriterion = "c"\n[[marker.step]]\n'
+            'type = "files_match"\nfiles = "*.py"\npattern = "%s"\n'
+            "out_of = 1\n%s" % (PATTERN[0], extra)
+        )
+        exercise, _ = load_exercise(str(arb), str(tmp_path))
+        exercise.run(ask_interactively=None)
+        return exercise.markers[0].results[0]
+
+    PATTERN = ["print"]
+    assert run('feedback = "Well done"\n').feedback == "Well done"
+    assert "matches" in run("").feedback
+    PATTERN[0] = "nothing"
+    assert run('fail_feedback = "No print"\n').feedback == "No print"
+    assert "no line matches" in run("").feedback

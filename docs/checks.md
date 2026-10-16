@@ -72,9 +72,49 @@ With `full_feedback`, moving from the score box to the feedback box (Enter
 or Tab) after entering full marks fills the empty feedback box with that
 text, which the marker may edit or clear. With `require_feedback`, the
 marker cannot record a score below full marks without writing feedback.
+In the terminal UI the feedback box is eight lines tall and wraps; Enter
+finishes the answer and Ctrl-J starts a new line.
 The plain prompt asks for feedback only when either key is set. Questions
 marked automatically keep the feedback of the check or match that decided
 them.
+
+## Feedback for automatic checks
+
+Any check step may say what the student is told:
+
+```toml
+[[marker.step]]
+type = "files_match"
+files = "*.py"
+pattern = '\bprint\b'
+out_of = 1
+feedback = "Your code prints system information."     # on a pass
+fail_feedback = "No print statement was found."       # on a zero
+```
+
+`feedback` is used when the check passes. `fail_feedback` is used when the
+check scores zero, that is when no later `or_else` step decided instead
+(that step's own feedback is used if it did). With neither, the student gets
+what the check found, such as `no file matching /README.md`. The marker
+still sees what the check found.
+
+## Feedback with no mark
+
+An `ask_for_feedback` step scores nothing and asks only for feedback, for
+overall comments to the student. The terminal UI shows no score box.
+
+```toml
+[[marker]]
+criterion = "overall"
+title = "Overall comments"
+
+[[marker.step]]
+type = "ask_for_feedback"
+question = "Any overall comments for the student?"
+require_feedback = true       # optional: may not be left empty
+```
+
+Empty feedback is recorded as `marker-entered` unless required.
 
 ## Showing the marker things
 

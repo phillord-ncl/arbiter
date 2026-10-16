@@ -11,10 +11,11 @@ from rich.text import Text
 from textual import events
 from textual.command import Hit, Provider
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.message import Message
 from textual.screen import ModalScreen
 from textual.widget import Widget
 from textual.widgets import (
-    Footer, Input, Label, OptionList, Static, TabbedContent, TabPane,
+    Footer, Input, Label, OptionList, Static, TabbedContent, TabPane, TextArea,
 )
 
 from .config import VIEWER_CHOICES, VIEWER_LABELS, save_viewer
@@ -201,6 +202,48 @@ class ViewerCommands(Provider):
             )
 
 
+class FeedbackBox(TextArea):
+    """A wrapped, several-line box for the feedback. Enter submits, as in the
+    one-line boxes; Ctrl-J starts a new line. ``value`` and
+    ``cursor_position`` mirror ``Input``'s."""
+
+    class Submitted(Message):
+        pass
+
+    def __init__(self, value="", placeholder="", **kwargs):
+        super().__init__(
+            value, soft_wrap=True, placeholder=placeholder, **kwargs
+        )
+
+    @property
+    def value(self):
+        return self.text
+
+    @value.setter
+    def value(self, text):
+        self.text = text
+
+    @property
+    def cursor_position(self):
+        return len(self.text)
+
+    @cursor_position.setter
+    def cursor_position(self, _):
+        self.move_cursor(self.document.end)
+
+    async def _on_key(self, event):
+        if event.key == "enter":
+            event.stop()
+            event.prevent_default()
+            self.post_message(self.Submitted())
+        elif event.key == "ctrl+j":
+            event.stop()
+            event.prevent_default()
+            self.insert("\n")
+        else:
+            await super()._on_key(event)
+
+
 class QuestionApp(App, inherit_bindings=False):
     COMMANDS = App.COMMANDS | {ViewerCommands}
 
@@ -212,6 +255,7 @@ class QuestionApp(App, inherit_bindings=False):
     #marked { height: 1fr; border: round $primary; border-title-align: left; padding: 0 1; }
     #progress { height: auto; border: round $primary; padding: 0 1; }
     #entry { height: auto; }
+    #feedback { height: 8; }
     """
     BINDINGS = [
         ## Footer order follows this order. Textual's own bindings are not
@@ -283,20 +327,25 @@ class QuestionApp(App, inherit_bindings=False):
                     )
         previous = self.question.previous
         yield Input(
-            value=format(previous.score, "g") if previous else "",
+            value="0" if self.question.feedback_only
+            else format(previous.score, "g") if previous else "",
             placeholder="score ({})".format(self.question.allowed()),
             id="score",
         )
-        yield Input(
-            value=previous.feedback if previous else "",
-            placeholder="feedback",
+        yield FeedbackBox(
+            previous.feedback if previous else "",
+            placeholder="feedback (Enter to finish, Ctrl-J for a new line)",
             id="feedback",
         )
         yield Footer()
 
     def on_mount(self):
         self.query_one("#marked").border_title = "Marked so far"
-        self.query_one("#score").focus()
+        if self.question.feedback_only:
+            self.query_one("#score").display = False
+            self.query_one("#feedback").focus()
+        else:
+            self.query_one("#score").focus()
 
     def _file_item(self):
         """The file for Ctrl-O/Ctrl-X: this tab's if it is a file, else the
@@ -389,7 +438,8 @@ class QuestionApp(App, inherit_bindings=False):
     def on_input_submitted(self, event):
         if event.input.id == "score":
             self.query_one("#feedback").focus()
-            return
+
+    def on_feedback_box_submitted(self, event):
         text = self.query_one("#score").value.strip()
         try:
             score = float(text) if text else 0.0

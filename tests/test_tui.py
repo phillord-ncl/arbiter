@@ -366,3 +366,22 @@ def test_configure_viewer_is_in_the_menu(tmp_path):
     from arbiter.tui import ViewerCommands
 
     assert ViewerCommands in QuestionApp.COMMANDS
+
+
+def test_feedback_only_question_hides_the_score_box(tmp_path):
+    question = _question(tmp_path)
+    question.out_of = 0
+    question.choices = [0]
+    question.feedback_only = True
+    question.require_feedback = True
+    app = QuestionApp(question)
+
+    async def go():
+        async with app.run_test() as pilot:
+            assert not app.query_one("#score").display
+            await pilot.press("enter")
+            assert app.result is None
+            await pilot.press(*"nice", "enter")
+
+    asyncio.run(go())
+    assert (app.result.score, app.result.feedback) == (0.0, "nice")

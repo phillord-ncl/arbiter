@@ -55,6 +55,10 @@ submission before marking.
     require_feedback = true              # optional: feedback needed unless
                                          # full marks
 
+    type = "ask_for_feedback"            # no score, only feedback
+    question = "Any overall comments for the student? "
+    require_feedback = true              # optional
+
 Mechanical checks (see arbiter.checks) score full marks when they pass and
 are otherwise undecided, so ``or_else = true`` on a following step lets a
 human decide, shown what the check found::
@@ -63,6 +67,9 @@ human decide, shown what the check found::
     files = ["README.md", "README"]      #   word_count, git_commit_count,
     out_of = 1                           #   git_log_matches,
                                          #   note_unexpected_hidden
+    # Any of these may set  feedback = "..."  (what the student is told on a
+    # pass) and  fail_feedback = "..."  (on a zero, when no later or_else
+    # step decides); the default for both is what the check found.
     # file_exists: optionally require = "all" (a file for each of files)
     # file_contains / files_match:  files = [...], pattern = "regexp"
     # word_count:     files = [...], low = 300, high = 500, over = 0.1
@@ -135,18 +142,33 @@ def _files(spec):
     return [files] if isinstance(files, str) else list(files)
 
 
+def _fb(spec):
+    return dict(
+        feedback=spec.get("feedback"), fail_feedback=spec.get("fail_feedback")
+    )
+
+
 CHECKS = {
     "file_exists": lambda m, s: m.file_exists(
-        s["out_of"], *_files(s), require_all=s.get("require", "any") == "all"
+        s["out_of"], *_files(s), require_all=s.get("require", "any") == "all",
+        **_fb(s)
     ),
-    "file_contains": lambda m, s: m.file_contains(s["out_of"], _files(s), s["pattern"]),
-    "files_match": lambda m, s: m.files_match(s["out_of"], _files(s), s["pattern"]),
+    "file_contains": lambda m, s: m.file_contains(
+        s["out_of"], _files(s), s["pattern"], **_fb(s)
+    ),
+    "files_match": lambda m, s: m.files_match(
+        s["out_of"], _files(s), s["pattern"], **_fb(s)
+    ),
     "word_count": lambda m, s: m.word_count(
-        s["out_of"], _files(s), s["low"], s["high"], s.get("under", 0.0), s.get("over", 0.0)
+        s["out_of"], _files(s), s["low"], s["high"], s.get("under", 0.0), s.get("over", 0.0),
+        **_fb(s)
     ),
-    "git_commit_count": lambda m, s: m.git_commit_count(s["out_of"], s["at_least"]),
+    "git_commit_count": lambda m, s: m.git_commit_count(
+        s["out_of"], s["at_least"], **_fb(s)
+    ),
     "git_log_matches": lambda m, s: m.git_log_matches(
-        s["out_of"], s["pattern"], s.get("messages", True), s.get("diffs", True)
+        s["out_of"], s["pattern"], s.get("messages", True), s.get("diffs", True),
+        **_fb(s)
     ),
     "note_unexpected_hidden": lambda m, s: m.note_unexpected_hidden(
         tuple(s.get("allowed", (".git", ".gitignore")))
@@ -176,6 +198,11 @@ def _add_step(marker, spec, where, directory):
             marker.match_stdout(spec["out_of"], *matchers)
         elif kind in CHECKS:
             CHECKS[kind](marker, spec)
+        elif kind == "ask_for_feedback":
+            marker.ask_for_feedback(
+                _question(spec, directory),
+                require_feedback=spec.get("require_feedback", False),
+            )
         elif kind == "ask_for_score":
             marker.ask_for_score(
                 _question(spec, directory),
@@ -187,7 +214,7 @@ def _add_step(marker, spec, where, directory):
         else:
             raise ArbTomlError(
                 "{}: unknown step type {!r} (want one of python, "
-                "match_stdout, ask_for_score, {})".format(
+                "match_stdout, ask_for_score, ask_for_feedback, {})".format(
                     where, kind, ", ".join(CHECKS)
                 )
             )

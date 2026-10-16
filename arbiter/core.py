@@ -104,6 +104,9 @@ class Question:
     full_feedback: Optional[str] = None
     ## Whether the marker must write feedback unless they give full marks.
     require_feedback: bool = False
+    ## A question that scores nothing and only asks for feedback; the UI
+    ## shows no score box and the feedback is required if ``require_feedback``.
+    feedback_only: bool = False
 
     def accepts(self, score):
         if self.choices is not None:
@@ -115,8 +118,11 @@ class Question:
 
     def feedback_problem(self, score, feedback):
         """Why ``feedback`` is not enough for ``score``, else None."""
-        if self.require_feedback and not feedback and not self.is_full(score):
-            return "Feedback is required unless the score is full marks"
+        if self.require_feedback and not feedback:
+            if self.feedback_only:
+                return "Feedback is required"
+            if not self.is_full(score):
+                return "Feedback is required unless the score is full marks"
         return None
 
     def default_feedback(self, score):
@@ -286,18 +292,20 @@ class DirectoryMarker(Marker):
         return self.directory
 
 
-    def _check(self, out_of, check):
+    def _check(self, out_of, check, feedback=None, fail_feedback=None):
         """A scoring step from ``check(root) -> (ok, message)`` (see
         arbiter.checks). Passing scores ``out_of``; otherwise the step is
         undecided -- 0 unless an ``or_else()`` step follows -- and either
-        way ``message`` is noted for a human question to show."""
+        way ``message`` is noted for a human question to show. The
+        feedback a student gets is ``feedback`` on a pass and
+        ``fail_feedback`` on a zero, else ``message``."""
 
         def action(ctx):
             ok, message = check(self.root)
             ctx.notes.append(message)
             if ok:
-                return Result(out_of, out_of, message)
-            ctx.last_message = message
+                return Result(out_of, out_of, feedback or message)
+            ctx.last_message = fail_feedback or message
             return UNDECIDED
 
         return self._step(
@@ -307,31 +315,39 @@ class DirectoryMarker(Marker):
             undecided_result=lambda ctx: Result(out_of, 0, ctx.last_message),
         )
 
-    def file_exists(self, out_of, *patterns, require_all=False):
+    def file_exists(self, out_of, *patterns, require_all=False, feedback=None, fail_feedback=None):
         """Score ``out_of`` if the submission has a file matching any of
         the case-insensitive globs -- or each of them, with
         ``require_all`` (a pattern with no ``/`` matches a file's name
         wherever it is; a leading ``/`` means only at the top)."""
         return self._check(
-            out_of, lambda root: checks.file_exists(root, patterns, require_all)
+            out_of,
+            lambda root: checks.file_exists(root, patterns, require_all),
+            feedback,
+            fail_feedback,
         )
 
-    def file_contains(self, out_of, patterns, regexp):
+    def file_contains(self, out_of, patterns, regexp, feedback=None, fail_feedback=None):
         """Score ``out_of`` if a file matching ``patterns`` (a glob or a
         list of them) has text matching ``regexp``, ignoring case."""
         return self._check(
             out_of,
             lambda root: checks.file_contains(root, _as_list(patterns), regexp),
+            feedback,
+            fail_feedback,
         )
 
-    def files_match(self, out_of, patterns, regexp):
+    def files_match(self, out_of, patterns, regexp, feedback=None, fail_feedback=None):
         """Score ``out_of`` if any line of any file matching ``patterns``
         matches ``regexp`` (case-sensitive; use ``(?i)`` for otherwise)."""
         return self._check(
-            out_of, lambda root: checks.files_match(root, _as_list(patterns), regexp)
+            out_of,
+            lambda root: checks.files_match(root, _as_list(patterns), regexp),
+            feedback,
+            fail_feedback,
         )
 
-    def word_count(self, out_of, patterns, low, high, under=0.0, over=0.0):
+    def word_count(self, out_of, patterns, low, high, under=0.0, over=0.0, feedback=None, fail_feedback=None):
         """Score ``out_of`` if the words in the files matching
         ``patterns`` number from ``low`` to ``high``, widened by
         ``under`` below ``low`` and ``over`` above ``high`` (0.1 is 10%)."""
@@ -340,18 +356,26 @@ class DirectoryMarker(Marker):
             lambda root: checks.word_count(
                 root, _as_list(patterns), low, high, under, over
             ),
+            feedback,
+            fail_feedback,
         )
 
-    def git_commit_count(self, out_of, at_least):
+    def git_commit_count(self, out_of, at_least, feedback=None, fail_feedback=None):
         return self._check(
-            out_of, lambda root: checks.git_commit_count(root, at_least)
+            out_of,
+            lambda root: checks.git_commit_count(root, at_least),
+            feedback,
+            fail_feedback,
         )
 
-    def git_log_matches(self, out_of, regexp, messages=True, diffs=True):
+    def git_log_matches(self, out_of, regexp, messages=True, diffs=True, feedback=None, fail_feedback=None):
         """Score ``out_of`` if any commit's message (``messages``) or
         changed lines (``diffs``) match ``regexp``, ignoring case."""
         return self._check(
-            out_of, lambda root: checks.git_log_matches(root, regexp, messages, diffs)
+            out_of,
+            lambda root: checks.git_log_matches(root, regexp, messages, diffs),
+            feedback,
+            fail_feedback,
         )
 
     def note_unexpected_hidden(self, allowed=(".git", ".gitignore")):
@@ -501,7 +525,7 @@ class RunMarker(DirectoryMarker):
 
     def ask_for_score(
         self, question, out_of, choices=None, full_feedback=None,
-        require_feedback=False,
+        require_feedback=False, feedback_only=False,
     ):
         """``question`` may be a plain string, or a callable taking the
         Marker's own RunContext -- e.g. to quote the script's own stdout
@@ -510,7 +534,8 @@ class RunMarker(DirectoryMarker):
         the marker may enter, in place of any number up to ``out_of``.
         ``full_feedback`` is the feedback offered when the marker gives full
         marks and has written none; ``require_feedback`` makes the marker
-        write some for any other score.
+        write some for any other score. ``feedback_only`` is for
+        ``ask_for_feedback``: no score is asked for.
         """
 
         after_or_else = self._next_is_fallback
@@ -535,9 +560,16 @@ class RunMarker(DirectoryMarker):
                 choices=list(choices) if choices is not None else None,
                 full_feedback=full_feedback,
                 require_feedback=require_feedback,
+                feedback_only=feedback_only,
             )
 
         return self._step(False, action, out_of=out_of)
+
+    def ask_for_feedback(self, question, require_feedback=False):
+        """Ask only for feedback, scoring nothing (out of 0)."""
+        return self.ask_for_score(
+            question, 0, [0], require_feedback=require_feedback, feedback_only=True
+        )
 
 
 def _undecided_result(step, ctx):

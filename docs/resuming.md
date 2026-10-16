@@ -18,6 +18,19 @@ score is no longer allowed, it is ignored.
 
 `--fresh` ignores the file and starts with empty boxes.
 
+## Checking the extremes
+
+`--mark-good` answers every question with full marks and its `full_feedback`
+(or `marker-entered` if it has none) without asking, so you can see what a
+perfect submission is told. With no submission it runs on an empty project
+like `--dry-run` and prints the answers, writing nothing. Given a submission
+it implies `--fresh` and overwrites the results:
+use a copy of the submission.
+
+`--mark-bad` is the opposite: the lowest allowed score for every question
+(zero, or the worst choice such as a deduction), with `marker-entered` as
+the feedback. The two cannot be combined.
+
 ## Going back a question
 
 Ctrl-B (or `back` at the plain prompt) returns to the previous question in

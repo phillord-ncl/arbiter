@@ -263,3 +263,35 @@ def test_cli_resumes_from_the_results_file_and_fresh_ignores_it(tmp_path):
     fresh = run("--fresh", answers="2\n")
     assert "Stored answer" not in fresh.output
     assert "a: 2.0/5" in fresh.output
+
+
+def test_mark_good_gives_full_marks_with_full_feedback():
+    from arbiter.cli import _mark_good_ask
+    from arbiter.core import Question
+
+    q = Question("?", out_of=3, full_feedback="All fine.")
+    r = _mark_good_ask(q)
+    assert (r.score, r.feedback) == (3, "All fine.")
+    r = _mark_good_ask(Question("?", out_of=0, choices=[0, -1]))
+    assert r.score == 0
+    r = _mark_good_ask(Question("?", out_of=2, choices=[0, 1]))
+    assert r.score == 1
+
+
+def test_mark_bad_gives_the_lowest_score():
+    from arbiter.cli import _mark_bad_ask
+    from arbiter.core import Question
+
+    assert _mark_bad_ask(Question("?", out_of=3)).score == 0
+    assert _mark_bad_ask(Question("?", out_of=0, choices=[0, -1])).score == -1
+
+
+def test_feedback_only_question_asks_for_no_score(monkeypatch):
+    from arbiter.cli import _default_ask_interactively
+    from arbiter.core import Question
+
+    q = Question("Comments?", 0, choices=[0], feedback_only=True, require_feedback=True)
+    answers = iter(["", "well done"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
+    r = _default_ask_interactively(q)
+    assert (r.score, r.out_of, r.feedback) == (0, 0, "well done")
