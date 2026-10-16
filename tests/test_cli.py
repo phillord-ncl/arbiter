@@ -278,3 +278,8 @@ def test_marker_is_asked_between_students_and_can_stop(tmp_path, monkeypatch):
     assert result.exit_code != 0  # Aborted at the second pause
     assert (subs / "c02" / "arb-results.toml").exists()
     assert not (subs / "c03" / "arb-results.toml").exists()
+
+
+def test_help_lists_the_unpack_subcommand():
+    result = CliRunner().invoke(cli, ["--help"])
+    assert "Subcommands" in result.output and "unpack" in result.output

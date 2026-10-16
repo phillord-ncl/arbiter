@@ -206,7 +206,10 @@ def _find_submission(name):
 
 @click.command(
     help="Run an arb.py or arb.toml's Exercise against each SUBMISSION. With "
-    "-r, each SUBMISSION is a directory of submissions instead."
+    "-r, each SUBMISSION is a directory of submissions instead.\n\n"
+    "\b\nSubcommands (arbiter COMMAND --help for each):\n"
+    "  unpack  Unpack uploads (zip, tar, or a Canvas download) into\n"
+    "          submissions ready to mark."
 )
 @click.argument("submissions", nargs=-1, required=True)  # a directory, or a unique NAME@... / NAME...
 @click.option(
