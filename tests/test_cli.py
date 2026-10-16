@@ -283,3 +283,66 @@ def test_marker_is_asked_between_students_and_can_stop(tmp_path, monkeypatch):
 def test_help_lists_the_unpack_subcommand():
     result = CliRunner().invoke(cli, ["--help"])
     assert "Subcommands" in result.output and "unpack" in result.output
+
+
+DRY_TOML = textwrap.dedent(
+    """
+    root = "project"
+
+    [[marker]]
+    criterion = "a"
+
+    [[marker.step]]
+    type = "python"
+    entry_point = "a.py"
+
+    [[marker.step]]
+    type = "file_exists"
+    files = "README.md"
+    out_of = 1
+
+    [[marker.step]]
+    type = "ask_for_score"
+    or_else = true
+    out_of = 1
+    choices = [0, 1]
+    question = "readme?"
+    """
+)
+
+
+def test_dry_run_shows_the_questions_and_writes_nothing(tmp_path, monkeypatch):
+    (tmp_path / "arb.toml").write_text(DRY_TOML)
+    monkeypatch.chdir(tmp_path)
+    asked = []
+
+    def ask(question):
+        asked.append((question.question, question.session.label))
+        return Result(1, 1, "x")
+
+    monkeypatch.setattr("arbiter.cli._choose_ask", lambda tui, progress=None: ask)
+    from arbiter.core import Result
+
+    result = CliRunner().invoke(cli, ["--dry-run"])
+    assert result.exit_code == 0, result.output
+    assert asked == [("readme?", "dry run")]
+    assert "nothing was written" in result.output
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["arb.toml"]
+
+
+def test_dry_run_takes_no_submission_and_others_need_one(tmp_path, monkeypatch):
+    (tmp_path / "arb.toml").write_text(DRY_TOML)
+    monkeypatch.chdir(tmp_path)
+    assert CliRunner().invoke(cli, ["--dry-run", str(tmp_path)]).exit_code != 0
+    assert CliRunner().invoke(cli, []).exit_code != 0
+
+
+def test_dry_run_does_not_run_the_students_code(tmp_path, monkeypatch):
+    (tmp_path / "arb.py").write_text(ARB_PY)
+    (tmp_path / "rubric.toml").write_text(CONSISTENT_RUBRIC_TOML)
+    monkeypatch.chdir(tmp_path)
+    ran = []
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: ran.append(a))
+    result = CliRunner().invoke(cli, ["--dry-run", "--no-tui"])
+    assert result.exit_code == 0, result.output
+    assert not ran

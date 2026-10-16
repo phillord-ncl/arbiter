@@ -28,6 +28,11 @@ terminal UI. To upgrade later, run the same command with `--force`.
 arbiter --arb arb.toml path/to/submission
 ```
 
+While writing an arb file, `arbiter --arb arb.toml --dry-run` steps through
+every question as a marker would see it, with no submission: nothing is run or
+written, and your answers are thrown away. The automatic checks find no files,
+so their fallback questions appear too.
+
 With no `--arb`, arbiter looks in the current directory for an `arb.toml` or
 `arb.py`. See `examples/` for small working schemes, and `docs/` for the
 available checks, how to resume a session, and how to configure the terminal

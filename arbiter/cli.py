@@ -12,6 +12,7 @@ import importlib.util
 import glob
 import os
 import sys
+import tempfile
 import tomllib
 
 import click
@@ -211,7 +212,7 @@ def _find_submission(name):
     "  unpack  Unpack uploads (zip, tar, or a Canvas download) into\n"
     "          submissions ready to mark."
 )
-@click.argument("submissions", nargs=-1, required=True)  # a directory, or a unique NAME@... / NAME...
+@click.argument("submissions", nargs=-1)  # a directory, or a unique NAME@... / NAME...
 @click.option(
     "-r",
     "--recursive",
@@ -265,8 +266,23 @@ def _find_submission(name):
     help="Answer questions in the terminal UI (needs the tui extra). "
          "Default: use it if installed and running in a terminal.",
 )
-def cli(submissions, recursive, arb_path, output, also, root, fresh, tui):
+@click.option(
+    "--dry-run",
+    "dry_run",
+    is_flag=True,
+    help="Show every question as a marker would see it, with no submission: "
+         "nothing is run or written and answers are thrown away. For "
+         "writing an arb file.",
+)
+def cli(submissions, recursive, arb_path, output, also, root, fresh, tui, dry_run):
     arb_path = arb_path or _find_arb()
+    if dry_run:
+        if submissions:
+            raise click.UsageError("--dry-run takes no submission")
+        _dry_run(arb_path, root, tui)
+        return
+    if not submissions:
+        raise click.UsageError("Missing argument 'SUBMISSIONS...'.")
     found = _expand(submissions, recursive)
     if not found:
         raise click.ClickException("no submissions found")
@@ -325,6 +341,44 @@ def _confirm_next(chosen, finished, upcoming, progress):
             default=True,
         )
     return True
+
+
+def _dry_run(arb_path, root, tui):
+    """Walk the whole scheme on an empty project in a temporary directory,
+    so an arb file's author sees what a marker will. The student's code is
+    never run, and no results or scripts are written."""
+    with tempfile.TemporaryDirectory(prefix="arbiter-dry-run-") as tmp:
+        if arb_path.endswith(".toml"):
+            try:
+                exercise, rubric_toml = load_exercise(arb_path, tmp, root)
+            except ArbTomlError as e:
+                raise click.ClickException("{}: {}".format(arb_path, e))
+            ask_interactively = _choose_ask(tui)
+        else:
+            module = _load_arb(arb_path)
+            project_dir = os.path.join(tmp, root) if root else tmp
+            os.makedirs(project_dir, exist_ok=True)
+            exercise = module.build(project_dir)
+            exercise.directory = project_dir
+            rubric_toml = getattr(module, "RUBRIC_TOML", None)
+            ask_interactively = (
+                getattr(module, "ask_interactively", None) or _choose_ask(tui)
+            )
+        if rubric_toml is not None:
+            exercise.apply_rubric(rubric_toml)
+        project = exercise.directory or tmp
+        os.makedirs(project, exist_ok=True)
+        exercise.dry_run = True
+        try:
+            exercise.run(
+                ask_interactively=ask_interactively,
+                label="dry run",
+                directory=os.path.abspath(project),
+            )
+        except KeyboardInterrupt:
+            click.echo("Dry run stopped.", err=True)
+            sys.exit(1)
+    click.echo("Dry run: nothing was written.", err=True)
 
 
 def _mark(submission, arb_path, output, also, root, fresh, choose, batch):

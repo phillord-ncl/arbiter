@@ -182,6 +182,9 @@ class RunContext:
         self.notes = []
         ## What the show_* steps chose to put in front of a human question.
         self.shown = []
+        ## Set from Exercise.dry_run: a step that would run the student's
+        ## code does nothing.
+        self.dry_run = False
 
 
 class Marker:
@@ -450,6 +453,8 @@ class RunMarker(DirectoryMarker):
         have been written (``Exercise.prepare``)."""
 
         def action(ctx):
+            if ctx.dry_run:
+                return None
             if venv:
                 command = [
                     marker_scripts.script_path(self.root, "marker-python"),
@@ -476,7 +481,10 @@ class RunMarker(DirectoryMarker):
         scores 0."""
 
         def action(ctx):
-            stdout = ctx.completed_process.stdout
+            process = getattr(ctx, "completed_process", None)
+            if process is None:  # a dry run, so nothing was run
+                return UNDECIDED
+            stdout = process.stdout
             for matcher in matchers:
                 if matcher.matches(stdout):
                     return matcher.result(out_of)
@@ -549,6 +557,9 @@ class Exercise:
         self.use_scripts = False
         self.scripts = []
         self.python_version = None
+        ## True to show every question without running the student's code
+        ## (the checks still run, on whatever the directory holds).
+        self.dry_run = False
 
     def all_scripts(self):
         return marker_scripts.BUILTIN + self.scripts
@@ -647,6 +658,7 @@ class Exercise:
         questions = []  # [(marker, step, ctx, id)], deferred to the second pass
         for number, marker in enumerate(self.markers):
             ctx = RunContext()
+            ctx.dry_run = self.dry_run
             held = None  # last step to return UNDECIDED, awaiting a fallback
             for position, step in enumerate(marker.steps):
                 if step.fallback:
