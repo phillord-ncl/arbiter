@@ -73,6 +73,12 @@ def test_globs_ignore_case_and_match_names_anywhere():
 # ---- file checks -----------------------------------------------------------
 
 
+def test_leading_slash_matches_only_at_the_top():
+    assert submission.matches("ReadMe.md", "/readme.md")
+    assert not submission.matches("docs/readme.md", "/readme.md")
+    assert submission.matches("docs/readme.md", "readme.md")
+
+
 def test_file_exists_accepts_either_spelling(tmp_path):
     (tmp_path / "LICENSE.md").write_text("")
     results, asked = _score(tmp_path, lambda m: m.file_exists(1, "licence.md", "license.md"))

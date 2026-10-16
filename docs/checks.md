@@ -20,7 +20,9 @@ or can be a first pass that a person may overturn.
 
 Files are matched by case-insensitive glob. A pattern with no `/` matches a
 file's name wherever it is; one with a `/` (`doc/*.md`) matches the path from
-the project root. Hidden directories, virtualenvs, bytecode caches and
+the project root. A leading `/` pins a pattern to the project root, so
+`/README.md` matches only a top-level README.md, not one in a subdirectory.
+Hidden directories, virtualenvs, bytecode caches and
 `marker-*` files are never searched.
 
 Where the project is comes from the `arb.toml`, not a guess: `root =

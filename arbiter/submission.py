@@ -47,9 +47,13 @@ def walk(root):
 
 def matches(rel, pattern):
     """Case-insensitive glob. A pattern with no ``/`` is matched against
-    the file's own name wherever it is; with one, against the whole path."""
+    the file's own name wherever it is; with one, against the whole path.
+    A leading ``/`` anchors the pattern to the project root, so
+    ``/README.md`` matches only a top-level README.md."""
     rel, pattern = rel.lower(), pattern.lower()
-    if "/" not in pattern:
+    if pattern.startswith("/"):
+        pattern = pattern[1:]
+    elif "/" not in pattern:
         rel = rel.rsplit("/", 1)[-1]
     return fnmatch.fnmatchcase(rel, pattern)
 

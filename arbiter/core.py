@@ -308,7 +308,7 @@ class DirectoryMarker(Marker):
         """Score ``out_of`` if the submission has a file matching any of
         the case-insensitive globs -- or each of them, with
         ``require_all`` (a pattern with no ``/`` matches a file's name
-        wherever it is)."""
+        wherever it is; a leading ``/`` means only at the top)."""
         return self._check(
             out_of, lambda root: checks.file_exists(root, patterns, require_all)
         )
