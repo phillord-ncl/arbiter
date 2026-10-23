@@ -385,3 +385,16 @@ def test_feedback_only_question_hides_the_score_box(tmp_path):
 
     asyncio.run(go())
     assert (app.result.score, app.result.feedback) == (0.0, "nice")
+
+
+def test_bad_score_is_refused_when_leaving_the_score_box(tmp_path):
+    app = QuestionApp(_question(tmp_path))
+
+    async def go():
+        async with app.run_test() as pilot:
+            await pilot.press("9", "tab")
+            assert app.focused.id == "score"
+            await pilot.press("backspace", "3", "tab")
+            assert app.focused.id == "feedback"
+
+    asyncio.run(go())

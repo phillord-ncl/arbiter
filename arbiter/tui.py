@@ -419,19 +419,34 @@ class QuestionApp(App, inherit_bindings=False):
         except TerminalError as e:
             self.notify(str(e), severity="error")
 
+    def _score(self):
+        """The score typed, or None if it is not an allowed one."""
+        text = self.query_one("#score").value.strip()
+        try:
+            score = float(text) if text else 0.0
+        except ValueError:
+            return None
+        return score if self.question.accepts(score) else None
+
+    def _refuse_score(self):
+        self.notify(
+            "Score must be {}".format(self.question.allowed()), severity="error"
+        )
+        self.query_one("#score").focus()
+
     def on_descendant_focus(self, event):
         """Offer the full-marks feedback as soon as the marker moves to the
         feedback box (Enter or Tab), so they can see and edit it."""
         feedback = self.query_one("#feedback")
-        if event.widget is not feedback or feedback.value.strip():
+        if event.widget is not feedback:
             return
-        if not self.question.full_feedback:
+        if self._score() is None:
+            ## Leaving the score box with a bad score: stay in it.
+            self._refuse_score()
             return
-        try:
-            full = self.question.is_full(float(self.query_one("#score").value))
-        except ValueError:
+        if feedback.value.strip() or not self.question.full_feedback:
             return
-        if full:
+        if self.question.is_full(self._score()):
             feedback.value = self.question.full_feedback
             feedback.cursor_position = len(feedback.value)
 
@@ -440,17 +455,9 @@ class QuestionApp(App, inherit_bindings=False):
             self.query_one("#feedback").focus()
 
     def on_feedback_box_submitted(self, event):
-        text = self.query_one("#score").value.strip()
-        try:
-            score = float(text) if text else 0.0
-        except ValueError:
-            score = None
-        if score is None or not self.question.accepts(score):
-            self.notify(
-                "Score must be {}".format(self.question.allowed()),
-                severity="error",
-            )
-            self.query_one("#score").focus()
+        score = self._score()
+        if score is None:
+            self._refuse_score()
             return
         feedback = self.query_one("#feedback").value.strip()
         problem = self.question.feedback_problem(score, feedback)
