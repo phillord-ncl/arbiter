@@ -19,7 +19,7 @@ from textual.widgets import (
 )
 
 from .config import VIEWER_CHOICES, VIEWER_LABELS, save_viewer
-from .core import UNDECIDED_NOTE, GoBack, RestartMarking, Result
+from .core import UNDECIDED_NOTE, GoBack, RestartMarking, Result, SkipSubmission
 from .terminal import TerminalError, open_terminal
 
 
@@ -269,6 +269,7 @@ class QuestionApp(App, inherit_bindings=False):
         Binding("ctrl+t", "terminal", "Terminal"),
         Binding("ctrl+b", "back", "Previous question"),
         Binding("ctrl+r", "restart", "Restart marking"),
+        Binding("ctrl+n", "skip", "Skip student"),
         Binding("ctrl+q", "quit", "Quit", priority=True),
         Binding("ctrl+c", "help_quit", show=False, system=True),
         ## Textual's own command palette, relabelled; declaring it here
@@ -299,6 +300,7 @@ class QuestionApp(App, inherit_bindings=False):
         self.result = None
         self.restart = False
         self.back = False
+        self.skip = False
 
     def compose(self) -> ComposeResult:
         yield Label(_header_text(self.question), id="header", markup=False)
@@ -403,6 +405,10 @@ class QuestionApp(App, inherit_bindings=False):
             self.notify("This is the first question")
             return
         self.back = True
+        self.exit()
+
+    def action_skip(self):
+        self.skip = True
         self.exit()
 
     def action_restart(self):
@@ -531,6 +537,8 @@ def make_ask_interactively(viewer=None, terminal=None, progress=None):
             raise RestartMarking()
         if app.back:
             raise GoBack()
+        if app.skip:
+            raise SkipSubmission()
         if app.result is None:
             raise KeyboardInterrupt("question not answered")
         return app.result

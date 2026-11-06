@@ -1,3 +1,4 @@
+import tomllib
 import pytest
 import textwrap
 
@@ -346,3 +347,27 @@ def test_dry_run_does_not_run_the_students_code(tmp_path, monkeypatch):
     result = CliRunner().invoke(cli, ["--dry-run", "--no-tui"])
     assert result.exit_code == 0, result.output
     assert not ran
+
+
+def test_skip_leaves_a_student_unmarked_and_carries_on(tmp_path):
+    (tmp_path / "arb.toml").write_text(
+        '[[marker]]\ncriterion = "c"\ntitle = "t"\n'
+        '[[marker.step]]\ntype = "ask_for_score"\nquestion = "q? "\nout_of = 1\n'
+    )
+    subs = tmp_path / "subs"
+    for name in ("c01", "c02"):
+        (subs / name).mkdir(parents=True)
+    args = ["--arb", str(tmp_path / "arb.toml"), "--no-tui", "-r", str(subs)]
+
+    first = CliRunner().invoke(cli, args, input="skip\n1\n\n")
+
+    assert first.exit_code == 0, first.output
+    assert "c01: skipped, not marked" in first.output
+    skipped = tomllib.loads((subs / "c01" / "arb-results.toml").read_text())
+    assert skipped["skipped"] is True
+    assert skipped["complete"] is False
+    assert tomllib.loads((subs / "c02" / "arb-results.toml").read_text())["complete"]
+
+    again = CliRunner().invoke(cli, args)
+
+    assert "c01: skipped earlier, skipped" in again.output

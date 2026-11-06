@@ -15,7 +15,7 @@ import tempfile
 FILENAME = "arb-results"
 
 
-def report(exercise, submission, rubric, complete):
+def report(exercise, submission, rubric, complete, skipped=False):
     """A plain-data snapshot of ``exercise``'s results so far."""
     results = [
         {
@@ -35,6 +35,7 @@ def report(exercise, submission, rubric, complete):
         "submission": os.path.abspath(submission),
         "rubric": os.path.abspath(rubric) if rubric else "",
         "complete": complete,
+        "skipped": skipped,
         "score": exercise.score(),
         "out_of": exercise.max_score(),
         "restarts": getattr(exercise, "restarts", 0),
@@ -100,7 +101,9 @@ def render_text(data):
             "{}: {}/{}".format(part["part"], part["score"], part["out_of"])
         )
     lines.append("Total: {}/{}".format(data["score"], data["out_of"]))
-    if not data["complete"]:
+    if data.get("skipped"):
+        lines.append("(skipped: not marked)")
+    elif not data["complete"]:
         lines.append("(marking not finished)")
     return "\n".join(lines) + "\n"
 
@@ -155,8 +158,8 @@ class Dumper:
         self.rubric = rubric
         self.formats = ["toml", *[f for f in formats if f != "toml"]]
 
-    def write(self, exercise, complete=False):
-        data = report(exercise, self.submission, self.rubric, complete)
+    def write(self, exercise, complete=False, skipped=False):
+        data = report(exercise, self.submission, self.rubric, complete, skipped)
         for name in self.formats:
             suffix, render = FORMATS[name]
             _atomic_write(self.base + suffix, render(data))

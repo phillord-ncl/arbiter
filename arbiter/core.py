@@ -39,6 +39,12 @@ class GoBack(Exception):
     question."""
 
 
+class SkipSubmission(Exception):
+    """Raised by an ask hook to give up on this submission (it cannot be
+    marked, say). Not caught by ``Exercise.run``; the caller records the
+    skip and moves on."""
+
+
 UNDECIDED_NOTE = "(The automatic checks could not decide this one.)"
 
 

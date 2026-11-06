@@ -18,7 +18,7 @@ import tomllib
 import click
 
 from .config import ConfigError, default_viewer, load_terminal, load_viewer
-from .core import UNDECIDED_NOTE, GoBack, RestartMarking, Result
+from .core import UNDECIDED_NOTE, GoBack, RestartMarking, Result, SkipSubmission
 from .dump import FILENAME, FORMATS, Dumper, load_previous
 from .scripts import ScriptClash
 from .toml_exercise import ArbTomlError, load_exercise
@@ -59,6 +59,7 @@ def _default_ask_interactively(question):
             )
         )
     click.echo("(type 'restart' to mark this submission again from the start)")
+    click.echo("(type 'skip' to give up on this student and move on)")
     if session is not None and session.position > 1:
         click.echo("(type 'back' to return to the previous question)")
     if question.feedback_only:
@@ -74,6 +75,8 @@ def _default_ask_interactively(question):
         answer = input(question.question)
         if answer.strip().lower() == "restart":
             raise RestartMarking()
+        if answer.strip().lower() == "skip":
+            raise SkipSubmission()
         if answer.strip().lower() == "back":
             raise GoBack()
         if previous is not None and not answer.strip():
@@ -135,18 +138,31 @@ class Progress:
         self.done += 1
         self.note("{}: marked".format(name))
 
+    def gave_up(self, name):
+        self.done += 1
+        self.note("{}: skipped by the marker".format(name))
+
     def skipped(self, name):
         self.done += 1
         self.note("{}: already complete, skipped".format(name))
 
 
-def _is_complete(submission):
-    """True if the submission's results file says marking finished."""
+def _results_flag(submission, key):
     try:
         with open(os.path.join(submission, FILENAME + ".toml"), "rb") as f:
-            return bool(tomllib.load(f).get("complete"))
+            return bool(tomllib.load(f).get(key))
     except (OSError, ValueError):
         return False
+
+
+def _is_complete(submission):
+    """True if the submission's results file says marking finished."""
+    return _results_flag(submission, "complete")
+
+
+def _was_skipped(submission):
+    """True if the marker skipped this submission on an earlier run."""
+    return _results_flag(submission, "skipped")
 
 
 def _expand(paths, recursive):
@@ -363,6 +379,9 @@ def cli(
         if batch and not fresh and _is_complete(submission):
             progress.skipped(name)
             click.echo("{}: already complete, skipped".format(name), err=True)
+        elif batch and not fresh and _was_skipped(submission):
+            progress.skipped(name)
+            click.echo("{}: skipped earlier, skipped".format(name), err=True)
         else:
             todo.append(submission)
 
@@ -370,8 +389,10 @@ def cli(
     try:
         for i, submission in enumerate(todo):
             name = os.path.basename(os.path.abspath(submission))
-            _mark(submission, arb_path, output, also, root, fresh, choose, batch)
-            progress.finished(name)
+            if _mark(submission, arb_path, output, also, root, fresh, choose, batch):
+                progress.finished(name)
+            else:
+                progress.gave_up(name)
             done = getattr(chosen[0], "student_done", None) if chosen else None
             if done is not None:
                 done(submission)
@@ -502,13 +523,18 @@ def _mark(submission, arb_path, output, also, root, fresh, choose, batch):
     label = os.path.basename(os.path.abspath(submission))
     # Write after every human answer, not just at the end, so a crash
     # mid-marking keeps what was already entered.
-    exercise.run(
-        ask_interactively=ask_interactively,
-        checkpoint=dumper.write,
-        label=label,
-        directory=os.path.abspath(project),
-        previous=None if fresh else previous,
-    )
+    try:
+        exercise.run(
+            ask_interactively=ask_interactively,
+            checkpoint=dumper.write,
+            label=label,
+            directory=os.path.abspath(project),
+            previous=None if fresh else previous,
+        )
+    except SkipSubmission:
+        dumper.write(exercise, skipped=True)
+        click.echo("{}: skipped, not marked".format(label), err=True)
+        return False
     dumper.write(exercise, complete=True)
 
     if batch:
@@ -516,7 +542,7 @@ def _mark(submission, arb_path, output, also, root, fresh, choose, batch):
             "{}: {}/{}".format(label, exercise.score(), exercise.max_score()),
             err=True,
         )
-        return
+        return True
     for marker in exercise.markers:
         for result in marker.results:
             click.echo(
@@ -526,6 +552,7 @@ def _mark(submission, arb_path, output, also, root, fresh, choose, batch):
             )
     for path in dumper.paths():
         click.echo("results written to {}".format(path), err=True)
+    return True
 
 
 @click.command(name="unpack")

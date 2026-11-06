@@ -40,6 +40,15 @@ leave is kept as a stored one until you reach it again. It only moves within
 the current student; to correct one already finished, run `arbiter` on that
 submission again.
 
+## Skipping a student
+
+If a student cannot be marked at all (the submission is unusable, say),
+press Ctrl-N (or type `skip` at the plain prompt). Arbiter writes the
+results so far with `skipped = true` and `complete = false`, then goes on to
+the next student. A later run over several submissions leaves skipped
+students alone, as it does complete ones; name the submission on its own, or
+use `--fresh`, to mark it after all.
+
 ## Restarting after editing the submission
 
 If something not the student's fault stops the program running, fix it in a

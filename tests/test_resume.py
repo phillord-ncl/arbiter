@@ -295,3 +295,27 @@ def test_feedback_only_question_asks_for_no_score(monkeypatch):
     monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
     r = _default_ask_interactively(q)
     assert (r.score, r.out_of, r.feedback) == (0, 0, "well done")
+
+
+def test_plain_prompt_skip_raises_skip_submission(monkeypatch):
+    from arbiter.cli import _default_ask_interactively
+    from arbiter.core import Question, SkipSubmission
+
+    monkeypatch.setattr("builtins.input", lambda prompt: "skip")
+    with pytest.raises(SkipSubmission):
+        _default_ask_interactively(Question("?", 5))
+
+
+def test_tui_skip_key_sets_skip():
+    pytest.importorskip("textual")
+    from arbiter.core import Question
+    from arbiter.tui import QuestionApp
+
+    app = QuestionApp(Question("?", 5))
+
+    async def go():
+        async with app.run_test() as pilot:
+            await pilot.press("ctrl+n")
+
+    asyncio.run(go())
+    assert app.skip
