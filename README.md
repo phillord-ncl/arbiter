@@ -11,6 +11,15 @@ results to a file as it goes, so a marking session can be stopped and resumed.
 on few courses and platforms, and its interface and file formats may change
 without notice.
 
+arbiter is part of the tent-tools suite. See also:
+
+- [tent-pole](https://github.com/phillord-ncl/tent-pole) -- manage Canvas
+  course content as markdown and push it to Canvas
+- [tent-peg](https://github.com/phillord-ncl/tent-peg) -- download the
+  submissions you are marking from Canvas, and push marks back
+- [tent-pack](https://github.com/phillord-ncl/tent-pack) -- check student
+  coursework and pack it into a zip for upload
+
 ## Installing
 
 `arbiter` needs Python 3.12 or later and [pipx](https://pipx.pypa.io/).
