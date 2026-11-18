@@ -75,7 +75,8 @@ human decide, shown what the check found::
     # word_count:     files = [...], low = 300, high = 500, over = 0.1
     #                 (under / over: fraction allowed below low / above high)
     # git_commit_count:  at_least = 4
-    # git_log_matches:   pattern = "regexp", messages = true, diffs = true
+    # git_log_matches:   pattern = "regexp", messages = true, diffs = true,
+    #                    files = ["*.py"] (git pathspecs: diffs only in these)
     # note_unexpected_hidden:  allowed = [".git", ".gitignore"]  (no out_of)
 
 Steps that score nothing but choose what a later question shows (when any
@@ -168,6 +169,7 @@ CHECKS = {
     ),
     "git_log_matches": lambda m, s: m.git_log_matches(
         s["out_of"], s["pattern"], s.get("messages", True), s.get("diffs", True),
+        files=s.get("files", ()),
         **_fb(s)
     ),
     "note_unexpected_hidden": lambda m, s: m.note_unexpected_hidden(

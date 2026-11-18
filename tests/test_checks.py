@@ -234,6 +234,16 @@ def test_git_log_matches_messages_and_diffs(tmp_path):
     assert results[0].score == 1
 
 
+def test_git_log_matches_files_limits_the_diff(tmp_path):
+    _repo(tmp_path, ("Docs", {"README.md": "run hello_world.py\n", "a.py": "x = 1\n"}))
+    results, _ = _score(tmp_path, lambda m: m.git_log_matches(1, "hello_world", messages=False))
+    assert results[0].score == 1
+    results, _ = _score(
+        tmp_path, lambda m: m.git_log_matches(1, "hello_world", messages=False, files=["*.py"])
+    )
+    assert results[0].score == 0
+
+
 # ---- arb.toml --------------------------------------------------------------
 
 

@@ -104,9 +104,11 @@ def git_commit_count(root, at_least):
     return count >= at_least, "{} commit(s), wanted at least {}".format(count, at_least)
 
 
-def git_log_matches(root, regexp, messages, diffs):
+def git_log_matches(root, regexp, messages, diffs, files=()):
     """True if any commit's message and/or changed lines match ``regexp``
-    (case-insensitive extended regexp, as git understands it)."""
+    (case-insensitive extended regexp, as git understands it). ``files``
+    (git pathspecs, e.g. ``*.py``) limits the changed lines searched; the
+    message is unaffected."""
     if not has_git(root):
         return False, "no .git directory"
     where = []
@@ -115,8 +117,10 @@ def git_log_matches(root, regexp, messages, diffs):
     if diffs:
         where.append(("-G" + regexp, "diff"))
     for option, what in where:
+        paths = ["--", *files] if files and what == "diff" else []
         result = _git(
-            root, "log", "--all", "--regexp-ignore-case", "-E", "--format=%h", option
+            root, "log", "--all", "--regexp-ignore-case", "-E", "--format=%h",
+            option, *paths
         )
         if result is None or result[0] != 0:
             return False, "could not read the git history"

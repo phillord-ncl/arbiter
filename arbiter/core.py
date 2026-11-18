@@ -376,12 +376,14 @@ class DirectoryMarker(Marker):
             fail_feedback,
         )
 
-    def git_log_matches(self, out_of, regexp, messages=True, diffs=True, feedback=None, fail_feedback=None):
+    def git_log_matches(self, out_of, regexp, messages=True, diffs=True, files=(), feedback=None, fail_feedback=None):
         """Score ``out_of`` if any commit's message (``messages``) or
-        changed lines (``diffs``) match ``regexp``, ignoring case."""
+        changed lines (``diffs``) match ``regexp``, ignoring case.
+        ``files`` (git pathspecs such as ``*.py``) limits the changed
+        lines searched, so a mention in a README does not count."""
         return self._check(
             out_of,
-            lambda root: checks.git_log_matches(root, regexp, messages, diffs),
+            lambda root: checks.git_log_matches(root, regexp, messages, diffs, tuple(files)),
             feedback,
             fail_feedback,
         )
