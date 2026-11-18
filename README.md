@@ -1,4 +1,4 @@
-# arbiter
+# Arbiter: Mark Programming Assignments
 
 A tool for marking programming assignments. You describe the marking scheme
 once, in an `arb.toml` (or, for anything it cannot say, an `arb.py`). Then
