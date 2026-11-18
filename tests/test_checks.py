@@ -167,6 +167,21 @@ def test_word_count_with_no_such_file_is_undecided(tmp_path):
     assert results[0].score == 0 and "no file matching" in results[0].feedback
 
 
+def test_word_count_with_several_matching_files_is_left_to_the_marker(tmp_path):
+    (tmp_path / "doc").mkdir()
+    (tmp_path / "doc" / "report.md").write_text("word " * 149)
+    (tmp_path / "doc" / "notes.md").write_text("word " * 200)
+
+    def build(m):
+        m.word_count(1, "doc/*.md", 300, 500, over=0.1)
+        m.or_else()
+        m.ask_for_score("?", 1)
+
+    results, asked = _score(tmp_path, build, answers=[0])
+    assert results[0].decided_by == "human"
+    assert "cannot tell which is the report" in asked[0].context[0].text
+
+
 def test_unexpected_hidden_files_are_noted_not_scored(tmp_path):
     for d in [".git", ".venv", ".idea", "__MACOSX"]:
         (tmp_path / d).mkdir()

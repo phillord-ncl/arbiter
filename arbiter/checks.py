@@ -56,7 +56,12 @@ def word_count(root, patterns, low, high, under, over):
     files = submission.find(root, *patterns)
     if not files:
         return False, "no file matching {}".format(" or ".join(patterns))
-    count = sum(submission.word_count(submission.read(root, r)) for r in files)
+    if len(files) > 1:
+        # Summing would let several short files pass as one long report.
+        return False, "{} files match {} ({}); cannot tell which is the report".format(
+            len(files), " or ".join(patterns), ", ".join(files)
+        )
+    count = submission.word_count(submission.read(root, files[0]))
     wanted = "{} to {}".format(low, high)
     if under:
         wanted += ", {:g}% under allowed".format(under * 100)

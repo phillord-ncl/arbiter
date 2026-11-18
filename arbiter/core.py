@@ -356,7 +356,9 @@ class DirectoryMarker(Marker):
     def word_count(self, out_of, patterns, low, high, under=0.0, over=0.0, feedback=None, fail_feedback=None):
         """Score ``out_of`` if the words in the files matching
         ``patterns`` number from ``low`` to ``high``, widened by
-        ``under`` below ``low`` and ``over`` above ``high`` (0.1 is 10%)."""
+        ``under`` below ``low`` and ``over`` above ``high`` (0.1 is 10%).
+        If more than one file matches, the check fails (undecided) rather
+        than summing them, so a marker can pick the report."""
         return self._check(
             out_of,
             lambda root: checks.word_count(
